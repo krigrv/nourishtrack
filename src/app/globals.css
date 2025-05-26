@@ -1,0 +1,37 @@
+/* Tailwind CSS directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+:root {
+  --font-geist: 'Geist', system-ui, sans-serif;
+}
+
+body {
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Custom styles for NourishTrack */
+.baby-icon-container {
+  background-color: hsl(260, 100%, 85%, 0.2);
+}
+
+.baby-icon {
+  color: hsl(260, 100%, 85%);
+}
+
+/* Form styling */
+.form-card {
+  max-width: 28rem;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .form-card {
+    padding: 1rem;
+  }
+}

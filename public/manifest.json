@@ -1,0 +1,21 @@
+{
+  "name": "NourishTrack",
+  "short_name": "NourishTrack",
+  "description": "Log your breastfeeding and pumping sessions with ease.",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#E0B0FF"
+}

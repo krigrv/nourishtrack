@@ -1,0 +1,1 @@
+self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/Users/krishnagaurav/Documents/GitHub/nourishtrack/src/app/layout\":[\"static/media/569ce4b8f30dc480-s.p.woff2\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"
