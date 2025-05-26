@@ -1,15 +1,36 @@
-/* Tailwind CSS directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Base styles */
-:root {
-  --font-geist: 'Geist', system-ui, sans-serif;
-}
+@layer base {
+  :root {
+    --background: 240 13% 95%;
+    --foreground: 240 10% 10%;
+    --card: 240 13% 95%;
+    --card-foreground: 240 10% 10%;
+    --popover: 240 13% 95%;
+    --popover-foreground: 240 10% 10%;
+    --primary: 260 100% 85%;
+    --primary-foreground: 240 10% 10%;
+    --secondary: 260 80% 90%;
+    --secondary-foreground: 240 10% 10%;
+    --muted: 240 13% 90%;
+    --muted-foreground: 240 10% 40%;
+    --accent: 339 100% 85%;
+    --accent-foreground: 240 10% 10%;
+    --destructive: 0 100% 70%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 13% 85%;
+    --input: 240 13% 85%;
+    --ring: 260 100% 80%;
+    --radius: 0.625rem;
+    --font-geist: 'Geist', system-ui, sans-serif;
+  }
 
-body {
-  font-feature-settings: "rlig" 1, "calt" 1;
+  body {
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-geist), system-ui, sans-serif;
+  }
 }
 
 /* Custom styles for NourishTrack */
