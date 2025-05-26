@@ -42,7 +42,7 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
       unlatchReason: null,
       notes: "",
       pumpNotes: "",
-    },
+    } as FeedingLogData,
   });
 
   // Setup field array for multiple date/time entries
@@ -105,7 +105,7 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
           unlatchReason: null,
           notes: "",
           pumpNotes: "",
-        });
+        } as FeedingLogData);
         
         // Set current date and time for the first entry
         const now = new Date();
@@ -159,7 +159,7 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
       </CardDescription>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit((data) => onSubmit(data as FeedingLogData))} className="space-y-6">
             {/* Date/Time Fields */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">

@@ -14,9 +14,9 @@ export const DateTimeEntrySchema = z.object({
 
 // Create breast options schema to support checkboxes
 export const BreastOptionsSchema = z.object({
-  left: z.boolean().default(false),
-  right: z.boolean().default(false),
-});
+  left: z.boolean(),
+  right: z.boolean(),
+}).required();
 
 // Create and export FeedingLogSchema
 export const FeedingLogSchema = z.object({
