@@ -43,10 +43,10 @@ export default function Home() {
   return (
     <main className="min-h-screen p-4 md:p-8 flex flex-col items-center justify-between bg-gradient-to-b from-background to-muted/30">
       {/* Header Section */}
-      <div className="w-full max-w-md mx-auto text-center mb-6 md:mb-8 animate-fade-in">
-        <div className="flex justify-center items-center mb-3 relative">
+      <div className="w-full max-w-md mx-auto text-left mb-6 md:mb-8 animate-fade-in">
+        <div className="flex justify-start items-center mb-3 relative">
           <div className="baby-icon-container p-3 rounded-full bg-primary/10 shadow-sm">
-            <Baby className="h-10 w-10 md:h-12 md:w-12 text-primary baby-icon" aria-hidden="true" />
+            <img src="/icons/breast-icon.png" alt="Breast icon" className="h-10 w-10 md:h-12 md:w-12" aria-hidden="true" />
           </div>
           {activeTab === "past-logs" && (
             <Button 
@@ -69,7 +69,7 @@ export default function Home() {
         </div>
         <h1 className="text-3xl md:text-4xl font-bold mb-2 tracking-tight">NourishTrack</h1>
         <h2 className="text-xl md:text-2xl font-semibold mb-3 text-primary/90">Hey Chandralekha, How are you?</h2>
-        <div className="bg-card rounded-lg p-3 shadow-sm border border-border/50 max-w-sm mx-auto">
+        <div className="bg-card rounded-lg p-3 shadow-sm border border-border/50 max-w-sm">
           <p className="text-muted-foreground italic text-sm md:text-base">"{dailyQuote}"</p>
         </div>
       </div>

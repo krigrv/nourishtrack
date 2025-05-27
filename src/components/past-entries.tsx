@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { format, parseISO, isAfter, isBefore, isEqual, startOfDay, endOfDay } from "date-fns";
-import { Calendar, Edit, Filter, Trash2, X } from "lucide-react";
+import { saveAs } from "file-saver";
+import { Calendar, Edit, Filter, Trash2, X, Download } from "lucide-react";
 import { collection, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -401,6 +402,95 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
   // Clear date filters
   const clearFilters = () => {
     setDateFilter({ startDate: null, endDate: null });
+    setFilteredEntries(allEntries);
+  };
+
+  // Export entries to CSV
+  const exportToCSV = () => {
+    try {
+      // Use filtered entries if available, otherwise use all entries
+      const dataToExport = filteredEntries.length > 0 ? filteredEntries : allEntries;
+      
+      if (dataToExport.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "There are no feeding logs to export.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // CSV header
+      const headers = [
+        "Date", 
+        "Time", 
+        "Duration (min)", 
+        "Left Breast", 
+        "Right Breast", 
+        "Unlatch Reason", 
+        "Notes", 
+        "Pump Notes",
+        "Created At"
+      ];
+      
+      // Convert entries to CSV rows
+      const csvRows = dataToExport.map(entry => {
+        try {
+          // Format date and time
+          const dateStr = entry.dateTimeEntries[0]?.date 
+            ? format(new Date(entry.dateTimeEntries[0].date), "yyyy-MM-dd")
+            : "";
+          const timeStr = entry.dateTimeEntries[0]?.time || "";
+          
+          // Format breast options
+          const leftBreast = entry.breastOptions?.left ? "Yes" : "No";
+          const rightBreast = entry.breastOptions?.right ? "Yes" : "No";
+          
+          // Format created at date
+          const createdAtStr = entry.createdAt 
+            ? format(new Date(entry.createdAt), "yyyy-MM-dd HH:mm:ss")
+            : "";
+          
+          return [
+            dateStr,
+            timeStr,
+            entry.duration.toString(),
+            leftBreast,
+            rightBreast,
+            entry.unlatchReason || "",
+            entry.notes || "",
+            entry.pumpNotes || "",
+            createdAtStr
+          ];
+        } catch (error) {
+          console.error('Error processing entry for CSV:', error);
+          return ["", "", "", "", "", "", "", "", ""];
+        }
+      });
+      
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(","),
+        ...csvRows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(","))
+      ].join("\n");
+      
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+      const fileName = `nourishtrack-logs-${format(new Date(), "yyyy-MM-dd")}.csv`;
+      saveAs(blob, fileName);
+      
+      toast({
+        title: "Export Successful",
+        description: `${dataToExport.length} feeding logs exported to ${fileName}`,
+      });
+    } catch (error) {
+      console.error('Error exporting to CSV:', error);
+      toast({
+        title: "Export Failed",
+        description: "There was an error exporting your feeding logs.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -413,6 +503,18 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
           </CardDescription>
         </div>
         <div className="flex items-center space-x-2">
+          {/* Export Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 gap-1" 
+            onClick={exportToCSV}
+            title="Export logs to CSV"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Export</span>
+          </Button>
+          
           {/* Date Filter Controls */}
           <Popover>
             <PopoverTrigger asChild>

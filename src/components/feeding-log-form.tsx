@@ -139,11 +139,14 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
   return (
     <Card className="w-full shadow-sm border border-border/50 overflow-hidden transition-all duration-300 hover:shadow-md">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-card/50">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 rounded-full bg-primary/10">
-            <Baby className="h-5 w-5 text-primary" />
+        <div className="flex flex-col items-start justify-center">
+          <div className="flex items-center space-x-3 mb-1">
+            <div className="p-2 rounded-full bg-primary/10">
+              <Baby className="h-5 w-5 text-primary" />
+            </div>
+            <CardTitle className="text-xl tracking-tight">Log New Feeding Session</CardTitle>
           </div>
-          <CardTitle className="text-xl tracking-tight">Log New Feeding Session</CardTitle>
+          <p className="text-sm text-muted-foreground ml-11">Record details about your baby's feeding session</p>
         </div>
         {onTogglePastEntries && (
           <Button 
@@ -156,9 +159,7 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
           </Button>
         )}
       </CardHeader>
-      <CardDescription className="px-6 pb-2">
-        Record details about your baby's feeding session
-      </CardDescription>
+
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => onSubmit(data as FeedingLogData))} className="space-y-6">
@@ -263,16 +264,17 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
               ))}
               
               {/* Log Another Time Button */}
-              <div className="flex justify-center mt-2 mb-4">
+              <div className="flex justify-center mt-3 mb-5">
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="default"
+                  size="default"
                   onClick={addNewEntry}
-                  className="h-8 px-3 hover:bg-primary/5 transition-colors duration-200 border-primary/20 hover:border-primary/30 w-full"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm w-full py-5 relative overflow-hidden group"
                 >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Log Another Time
+                  <PlusCircle className="mr-2 h-5 w-5" />
+                  <span className="group-hover:scale-105 transition-transform duration-200">Log Another Time</span>
+                  <span className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-200"></span>
                 </Button>
               </div>
             </div>

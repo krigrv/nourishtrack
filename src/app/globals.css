@@ -10,9 +10,9 @@
     --card-foreground: 240 10% 10%;
     --popover: 240 13% 95%;
     --popover-foreground: 240 10% 10%;
-    --primary: 260 100% 85%;
-    --primary-foreground: 240 10% 10%;
-    --secondary: 260 80% 90%;
+    --primary: 270 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 60% 60%;
     --secondary-foreground: 240 10% 10%;
     --muted: 240 13% 90%;
     --muted-foreground: 240 10% 40%;
@@ -22,7 +22,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 240 13% 85%;
     --input: 240 13% 85%;
-    --ring: 260 100% 80%;
+    --ring: 270 70% 50%;
     --radius: 0.625rem;
     --font-geist: 'Geist', system-ui, sans-serif;
   }
