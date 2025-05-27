@@ -96,15 +96,48 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
       querySnapshot.forEach((doc) => {
         try {
           const data = doc.data();
+          
+          // Log the raw data retrieved from Firestore for debugging
+          console.log(`Retrieved document ${doc.id} from Firestore:`, JSON.stringify(data, null, 2));
+          
           // Ensure data structure is valid
           if (!data.dateTimeEntries || !Array.isArray(data.dateTimeEntries)) {
             console.warn(`Invalid dateTimeEntries for document ${doc.id}`, data);
             return; // Skip this entry
           }
           
+          // Process dateTimeEntries to ensure consistent time format
+          const processedDateTimeEntries = data.dateTimeEntries.map(entry => {
+            // Log the time format from Firestore
+            console.log("Time format from Firestore:", entry.time);
+            
+            let timeValue = entry.time;
+            // Ensure time is in the expected format for display
+            if (timeValue && timeValue.includes(":")) {
+              // Check if the time is in 24-hour format
+              const [hours, minutes] = timeValue.split(":");
+              const hour = parseInt(hours, 10);
+              const minute = parseInt(minutes, 10);
+              
+              // Convert to display format if needed (for UI consistency)
+              if (!timeValue.toLowerCase().includes("am") && !timeValue.toLowerCase().includes("pm")) {
+                // Convert 24-hour format to 12-hour format for display
+                const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+                const period = hour >= 12 ? "PM" : "AM";
+                timeValue = `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`;
+                console.log("Converted time for display:", timeValue);
+              }
+            }
+            
+            return {
+              date: entry.date,
+              time: timeValue
+            };
+          });
+          
           firestoreEntries.push({
             id: doc.id,
-            dateTimeEntries: data.dateTimeEntries || [{ date: new Date().toISOString(), time: "00:00" }],
+            dateTimeEntries: processedDateTimeEntries || [{ date: new Date().toISOString(), time: "00:00" }],
             duration: data.duration || 0,
             breastOptions: data.breastOptions || { left: false, right: false },
             unlatchReason: data.unlatchReason || null,
@@ -114,6 +147,9 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
               ? data.createdAt.toDate().toISOString() 
               : new Date().toISOString()
           });
+          
+          // Log the processed entry
+          console.log("Processed entry for display:", JSON.stringify(firestoreEntries[firestoreEntries.length - 1], null, 2));
         } catch (docError) {
           console.error(`Error processing document ${doc.id}:`, docError);
         }

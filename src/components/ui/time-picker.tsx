@@ -84,8 +84,11 @@ export function TimePickerComponent({ value, onChange, className }: TimePickerPr
       const minute = parseInt(minutes, 10)
       
       // Format as HH:MM for validation schema
-      return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+      const formattedTime = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+      console.log("Time picker output:", formattedTime);
+      return formattedTime;
     } catch (e) {
+      console.error("Error formatting time:", e);
       return time
     }
   }

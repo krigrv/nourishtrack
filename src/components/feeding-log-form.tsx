@@ -71,11 +71,43 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
       // Create a new entry with a unique ID
       const newEntry = {
         ...data,
-        // Convert Date objects to ISO strings for storage
-        dateTimeEntries: data.dateTimeEntries.map(entry => ({
-          date: entry.date instanceof Date ? entry.date.toISOString() : entry.date,
-          time: entry.time
-        })),
+        // Convert Date objects to ISO strings for storage and ensure time format is consistent
+        dateTimeEntries: data.dateTimeEntries.map(entry => {
+          // Ensure time is in the correct format (HH:MM)
+          let formattedTime = entry.time;
+          
+          // Log the original time value
+          console.log("Original time value:", entry.time);
+          
+          // Ensure the time is in the correct format
+          if (formattedTime && formattedTime.includes(":")) {
+            // Extract hours and minutes, ignoring AM/PM if present
+            const timeParts = formattedTime.split(" ")[0].split(":");
+            const hours = parseInt(timeParts[0], 10);
+            const minutes = parseInt(timeParts[1], 10);
+            
+            // Check if AM/PM is specified
+            const isPM = formattedTime.toLowerCase().includes("pm");
+            const isAM = formattedTime.toLowerCase().includes("am");
+            
+            // Adjust hours for 12-hour format if needed
+            let adjustedHours = hours;
+            if (isPM && hours < 12) {
+              adjustedHours = hours + 12;
+            } else if (isAM && hours === 12) {
+              adjustedHours = 0;
+            }
+            
+            // Format as HH:MM
+            formattedTime = `${adjustedHours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+            console.log("Formatted time value:", formattedTime);
+          }
+          
+          return {
+            date: entry.date instanceof Date ? entry.date.toISOString() : entry.date,
+            time: formattedTime
+          };
+        }),
         id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         createdAt: new Date().toISOString(),
       };
@@ -86,10 +118,13 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
         const { collection, addDoc } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase');
         
-        // Add document to Firestore
-        await addDoc(collection(db, "feedingLogs"), newEntry);
+        // Log the data being saved to Firestore for debugging
+        console.log("Saving to Firestore:", JSON.stringify(newEntry, null, 2));
         
-        console.log("Document successfully written to Firestore");
+        // Add document to Firestore
+        const docRef = await addDoc(collection(db, "feedingLogs"), newEntry);
+        
+        console.log("Document successfully written to Firestore with ID:", docRef.id);
       } catch (firestoreError) {
         console.error('Error writing to Firestore:', firestoreError);
         // Continue execution - we'll still save to local storage
