@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { format } from "date-fns";
-import { Baby, Loader2, PlusCircle, Trash2, History } from "lucide-react";
+import { Baby, Loader2, PlusCircle, Trash2, Calendar as CalendarIcon, Clock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -137,11 +137,13 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center space-x-2">
-          <Baby className="h-5 w-5 text-primary" />
-          <CardTitle className="text-xl">Log New Feeding Session</CardTitle>
+    <Card className="w-full shadow-sm border border-border/50 overflow-hidden transition-all duration-300 hover:shadow-md">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-card/50">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 rounded-full bg-primary/10">
+            <Baby className="h-5 w-5 text-primary" />
+          </div>
+          <CardTitle className="text-xl tracking-tight">Log New Feeding Session</CardTitle>
         </div>
         {onTogglePastEntries && (
           <Button 
@@ -162,51 +164,69 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
           <form onSubmit={form.handleSubmit((data) => onSubmit(data as FeedingLogData))} className="space-y-6">
             {/* Date/Time Fields */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-md font-medium">Date & Time</h3>
+              <div className="flex justify-between items-center mb-6 border-b border-border/30 pb-3">
+                <h3 className="text-lg font-medium flex items-center">
+                  <span className="p-1.5 rounded-full bg-primary/10 mr-2 inline-flex">
+                    <CalendarIcon className="h-4 w-4 text-primary" />
+                  </span>
+                  Feeding Times
+                </h3>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={addNewEntry}
-                  className="h-8 px-2"
+                  className="h-8 px-3 hover:bg-primary/5 transition-colors duration-200 border-primary/20 hover:border-primary/30"
                 >
-                  <PlusCircle className="mr-1 h-4 w-4" />
+                  <PlusCircle className="mr-2 h-4 w-4" />
                   Add Time
                 </Button>
               </div>
               
               {fields.map((field, index) => (
-                <div key={field.id} className="relative flex flex-col gap-4 rounded-md border p-4 md:flex-row">
+                <div 
+                  key={field.id} 
+                  className="relative flex flex-col gap-4 rounded-lg border border-border/50 p-4 md:flex-row bg-card/30 hover:bg-card/50 transition-colors duration-200 shadow-sm group animate-fade-in"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <div className="absolute -left-2 -top-2 bg-primary/10 rounded-full w-6 h-6 flex items-center justify-center text-xs font-medium text-primary border border-primary/20">
+                    {index + 1}
+                  </div>
+                  
                   {/* Date Field */}
                   <FormField
                     control={form.control}
                     name={`dateTimeEntries.${index}.date`}
                     render={({ field }) => (
                       <FormItem className="flex-1">
-                        <FormLabel>Date</FormLabel>
+                        <FormLabel className="text-sm font-medium flex items-center gap-1.5">
+                          <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                          Date
+                        </FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
                                 variant="outline"
-                                className="w-full pl-3 text-left font-normal"
+                                className="w-full pl-3 text-left font-normal flex justify-between items-center border-primary/20 hover:border-primary/40 transition-colors duration-200"
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
                                 ) : (
-                                  <span>Pick a date</span>
+                                  <span className="text-muted-foreground">Pick a date</span>
                                 )}
+                                <CalendarIcon className="h-4 w-4 opacity-70" />
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0 max-w-[95vw] md:max-w-[350px]" align="start">
+                          <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
                               selected={field.value}
                               onSelect={field.onChange}
                               initialFocus
-                              disabled={(date) => date > new Date() || date < new Date('2020-01-01')}
+                              // Allow any date - past, present, or future
+                              disabled={(date) => false}
                             />
                           </PopoverContent>
                         </Popover>
@@ -221,10 +241,14 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
                     name={`dateTimeEntries.${index}.time`}
                     render={({ field }) => (
                       <FormItem className="flex-1">
-                        <FormLabel>Time</FormLabel>
+                        <FormLabel className="text-sm font-medium flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                          Time
+                        </FormLabel>
                         <FormControl>
                           <Input
                             type="time"
+                            className="border-primary/20 hover:border-primary/40 transition-colors duration-200"
                             {...field}
                           />
                         </FormControl>
@@ -239,10 +263,10 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive/10 text-destructive border border-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-destructive/20"
                       onClick={() => remove(index)}
-                      className="absolute top-2 right-2 h-8 w-8"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -399,15 +423,25 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
             />
             
             {/* Submit Button */}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit Feeding Log"
-              )}
+            <Button 
+              type="submit" 
+              className="w-full mt-6 relative overflow-hidden group transition-all duration-300" 
+              disabled={isSubmitting}
+              size="lg"
+            >
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="group-hover:scale-105 transition-transform duration-300">Submit Feeding Log</span>
+                  </>
+                )}
+              </span>
+              <span className="absolute inset-0 bg-primary/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></span>
             </Button>
           </form>
         </Form>

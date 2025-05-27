@@ -18,12 +18,17 @@ const flattenErrors = (errors: ZodError) => {
 };
 
 /**
- * Simulates saving data to a Google Sheet
+ * Placeholder for server-side validation
+ * Actual storage will be handled on the client
  */
-export async function saveToGoogleSheet(data: FeedingLogData) {
-  console.log("Attempting to save to Google Sheet:", data);
-  // This is a placeholder for actual Google Sheets API integration
-  return true;
+export async function validateFeedingLog(data: FeedingLogData) {
+  try {
+    // Just validate the data
+    return { success: true };
+  } catch (error) {
+    console.error("Error validating document: ", error);
+    return { success: false, error };
+  }
 }
 
 /**
@@ -36,15 +41,15 @@ export async function submitFeedingLog(data: FeedingLogData) {
     
     console.log("Validated feeding log data:", validatedData);
     
-    // Save to Google Sheet (placeholder)
-    await saveToGoogleSheet(validatedData);
-    
+    // Just return success with the validated data
+    // Actual storage will be handled on the client side
     return { 
       success: true, 
-      message: "Feeding log submitted successfully! (Google Sheet save attempted)" 
+      message: "Feeding log validated successfully!", 
+      data: validatedData
     };
   } catch (error) {
-    console.error("Error submitting feeding log:", error);
+    console.error("Error validating feeding log:", error);
     
     if (error instanceof ZodError) {
       const flatErrorObject = flattenErrors(error);

@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Baby, History, RefreshCw } from "lucide-react";
+import { Baby, RefreshCw, PlusCircle, History } from "lucide-react";
 import { FeedingLogForm } from "@/components/feeding-log-form";
 import { PastEntries } from "@/components/past-entries";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
   const [dailyQuote, setDailyQuote] = useState("");
-  const [showPastEntries, setShowPastEntries] = useState(false);
+  const [activeTab, setActiveTab] = useState("new-entry");
   const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
   const currentYear = new Date().getFullYear();
@@ -40,54 +41,74 @@ export default function Home() {
   }, []);
   
   return (
-    <main className="min-h-screen p-4 md:p-8 flex flex-col items-center justify-between">
+    <main className="min-h-screen p-4 md:p-8 flex flex-col items-center justify-between bg-gradient-to-b from-background to-muted/30">
       {/* Header Section */}
-      <div className="w-full max-w-md mx-auto text-center mb-8">
-        <div className="flex justify-center items-center mb-2">
-          <div className="baby-icon-container p-3 rounded-full">
-            <Baby className="h-12 w-12 baby-icon" aria-hidden="true" />
+      <div className="w-full max-w-md mx-auto text-center mb-6 md:mb-8 animate-fade-in">
+        <div className="flex justify-center items-center mb-3 relative">
+          <div className="baby-icon-container p-3 rounded-full bg-primary/10 shadow-sm">
+            <Baby className="h-10 w-10 md:h-12 md:w-12 text-primary baby-icon" aria-hidden="true" />
           </div>
-          {showPastEntries && (
+          {activeTab === "past-logs" && (
             <Button 
               variant="outline" 
-              size="icon" 
-              className="rounded-full ml-4" 
+              size="sm" 
+              className="ml-4 absolute right-0 top-1/2 -translate-y-1/2 shadow-sm hover:shadow transition-all duration-200" 
               onClick={() => {
                 setRefreshKey(prev => prev + 1);
                 toast({
                   description: "Past entries refreshed",
+                  className: "bg-primary/10 border-primary/20 text-foreground",
                 });
               }}
               title="Refresh past entries"
             >
-              <RefreshCw className="h-5 w-5" />
-              <span className="sr-only">Refresh past entries</span>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
             </Button>
           )}
         </div>
-        <h1 className="text-4xl font-bold mb-2">NourishTrack</h1>
-        <h2 className="text-2xl font-semibold mb-2">Hey Chandralekha, How are you?</h2>
-        <p className="text-muted-foreground italic">"{dailyQuote}"</p>
+        <h1 className="text-3xl md:text-4xl font-bold mb-2 tracking-tight">NourishTrack</h1>
+        <h2 className="text-xl md:text-2xl font-semibold mb-3 text-primary/90">Hey Chandralekha, How are you?</h2>
+        <div className="bg-card rounded-lg p-3 shadow-sm border border-border/50 max-w-sm mx-auto">
+          <p className="text-muted-foreground italic text-sm md:text-base">"{dailyQuote}"</p>
+        </div>
       </div>
       
       {/* Main Content */}
-      <div className="w-full max-w-3xl mx-auto mb-8">
-        {/* Feeding Log Form */}
-        <div className="mb-8">
-          <FeedingLogForm 
-            onTogglePastEntries={() => {
-              setShowPastEntries(!showPastEntries);
-              if (!showPastEntries) {
-                setRefreshKey(prev => prev + 1);
-              }
-            }}
-            showPastEntries={showPastEntries}
-          />
-        </div>
-        
-        {/* Past Entries (Conditional) */}
-        {showPastEntries && (
-          <div className="mt-8">
+      <div className="w-full max-w-3xl mx-auto mb-8 px-1 sm:px-4">
+        <Tabs 
+          defaultValue="new-entry" 
+          value={activeTab} 
+          onValueChange={(value: string) => {
+            setActiveTab(value);
+            if (value === "past-logs") {
+              setRefreshKey(prev => prev + 1);
+            }
+          }}
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-2 mb-6 md:mb-8 rounded-xl p-1 shadow-sm bg-card border border-border/50">
+            <TabsTrigger 
+              value="new-entry" 
+              className="flex items-center justify-center rounded-lg transition-all duration-200 data-[state=active]:shadow-sm"
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              New Entry
+            </TabsTrigger>
+            <TabsTrigger 
+              value="past-logs" 
+              className="flex items-center justify-center rounded-lg transition-all duration-200 data-[state=active]:shadow-sm"
+            >
+              <History className="h-4 w-4 mr-2" />
+              Past Logs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="new-entry" className="mt-0">
+            <FeedingLogForm />
+          </TabsContent>
+
+          <TabsContent value="past-logs" className="mt-0">
             <PastEntries 
               key={refreshKey}
               onDelete={async (id) => {
@@ -106,13 +127,16 @@ export default function Home() {
                 }
               }} 
             />
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
       </div>
       
       {/* Footer Section */}
-      <footer className="w-full text-center text-sm text-muted-foreground py-4">
-        © {currentYear} NourishTrack. Made by your lovely husband
+      <footer className="w-full text-center text-sm text-muted-foreground py-6 mt-auto border-t border-border/30">
+        <div className="max-w-md mx-auto px-4">
+          <p className="mb-2">&copy; {currentYear} NourishTrack</p>
+          <p className="text-xs opacity-70">Made with ❤️ by your lovely husband</p>
+        </div>
       </footer>
     </main>
   );
