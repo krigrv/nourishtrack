@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { Baby, RefreshCw, PlusCircle, History } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { FeedingLogForm } from "@/components/feeding-log-form";
 import { PastEntries } from "@/components/past-entries";
 import { Button } from "@/components/ui/button";
@@ -46,9 +45,6 @@ export default function Home() {
       {/* Header Section */}
       <div className="w-full max-w-md mx-auto text-center mb-6 md:mb-8 animate-fade-in">
         <div className="flex justify-center items-center mb-3 relative">
-          <div className="absolute right-0 top-0">
-            <ThemeToggle />
-          </div>
           <div className="baby-icon-container p-3 rounded-full bg-primary/10 shadow-sm">
             <Baby className="h-10 w-10 md:h-12 md:w-12 text-primary baby-icon" aria-hidden="true" />
           </div>
