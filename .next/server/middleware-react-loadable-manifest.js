@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"components/feeding-log-form.tsx -> @/lib/firebase\":{\"id\":\"components/feeding-log-form.tsx -> @/lib/firebase\",\"files\":[]},\"components/feeding-log-form.tsx -> firebase/firestore\":{\"id\":\"components/feeding-log-form.tsx -> firebase/firestore\",\"files\":[]}}"

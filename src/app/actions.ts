@@ -34,10 +34,19 @@ export async function validateFeedingLog(data: FeedingLogData) {
 /**
  * Handles submission of feeding log data
  */
-export async function submitFeedingLog(data: FeedingLogData) {
+export async function submitFeedingLog(data: any) {
   try {
+    // Convert ISO date strings back to Date objects for validation
+    const preparedData = {
+      ...data,
+      dateTimeEntries: data.dateTimeEntries.map((entry: any) => ({
+        date: typeof entry.date === 'string' ? new Date(entry.date) : entry.date,
+        time: entry.time
+      }))
+    };
+    
     // Validate data against schema
-    const validatedData = FeedingLogSchema.parse(data);
+    const validatedData = FeedingLogSchema.parse(preparedData);
     
     console.log("Validated feeding log data:", validatedData);
     

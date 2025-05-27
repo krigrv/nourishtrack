@@ -8,7 +8,12 @@ export const breastOptions = ["left", "right", "both"] as const;
 
 // Create and export DateTimeEntrySchema
 export const DateTimeEntrySchema = z.object({
-  date: z.date(),
+  date: z.union([
+    z.date(),
+    z.string().refine((val) => !isNaN(new Date(val).getTime()), {
+      message: "Invalid date string",
+    })
+  ]),
   time: z.string().min(1).regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
 });
 

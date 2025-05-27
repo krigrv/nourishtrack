@@ -825,90 +825,128 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
           </div>
         ) : filteredEntries.length > 0 ? (
           <ScrollArea className="h-[400px]">
-            <div className="space-y-4">
-              {filteredEntries.map((entry) => (
-                <Card key={entry.id} className="p-4 relative">
-                  <div className="absolute top-2 right-2 flex space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => handleEdit(entry)}
-                      aria-label="Edit entry"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => handleDelete(entry.id)}
-                      aria-label="Delete entry"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+            <div className="space-y-6">
+              {/* Group entries by date */}
+              {(() => {
+                // Sort entries by date (newest first)
+                const sortedEntries = [...filteredEntries].sort((a, b) => {
+                  const dateA = typeof a.dateTimeEntries[0].date === 'string' 
+                    ? new Date(a.dateTimeEntries[0].date).getTime() 
+                    : new Date(a.dateTimeEntries[0].date).getTime();
+                  const dateB = typeof b.dateTimeEntries[0].date === 'string' 
+                    ? new Date(b.dateTimeEntries[0].date).getTime() 
+                    : new Date(b.dateTimeEntries[0].date).getTime();
+                  return dateB - dateA; // Newest first
+                });
+                
+                // Group by date
+                const groupedEntries: Record<string, FeedingLogEntry[]> = {};
+                
+                sortedEntries.forEach(entry => {
+                  try {
+                    const dateValue = typeof entry.dateTimeEntries[0].date === 'string' 
+                      ? parseISO(entry.dateTimeEntries[0].date) 
+                      : new Date(entry.dateTimeEntries[0].date);
+                    
+                    if (isNaN(dateValue.getTime())) {
+                      return;
+                    }
+                    
+                    const dateKey = format(dateValue, "yyyy-MM-dd");
+                    const displayDate = format(dateValue, "EEEE, MMMM d, yyyy");
+                    
+                    if (!groupedEntries[dateKey]) {
+                      groupedEntries[dateKey] = {
+                        entries: [],
+                        displayDate
+                      } as any;
+                    }
+                    
+                    (groupedEntries[dateKey] as any).entries.push(entry);
+                  } catch (error) {
+                    console.error('Error grouping entry by date:', error);
+                  }
+                });
+                
+                // Sort groups by date (newest first)
+                const sortedGroups = Object.keys(groupedEntries).sort().reverse();
+                
+                return sortedGroups.map(dateKey => (
+                  <div key={dateKey} className="space-y-3">
+                    <h3 className="text-sm font-semibold px-1 py-2 bg-muted/30 rounded-md sticky top-0 z-10">
+                      {(groupedEntries[dateKey] as any).displayDate}
+                    </h3>
+                    
+                    <div className="space-y-3 pl-2">
+                      {(groupedEntries[dateKey] as any).entries.map((entry: FeedingLogEntry) => (
+                        <Card key={entry.id} className="p-4 relative hover:shadow-md transition-shadow duration-200">
+                          <div className="absolute top-2 right-2 flex space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleEdit(entry)}
+                              aria-label="Edit entry"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleDelete(entry.id)}
+                              aria-label="Delete entry"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          <div className="flex items-center mb-3 text-primary">
+                            <Clock className="h-4 w-4 mr-1.5" />
+                            <span className="text-sm font-medium">{entry.dateTimeEntries[0]?.time || "N/A"}</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 mb-2">
+                            <div className="bg-muted/20 p-2 rounded-md">
+                              <p className="text-xs text-muted-foreground">Duration</p>
+                              <p className="text-sm font-medium">{entry.duration} minutes</p>
+                            </div>
+                            
+                            <div className="bg-muted/20 p-2 rounded-md">
+                              <p className="text-xs text-muted-foreground">Breast</p>
+                              <p className="text-sm font-medium">{formatBreastOptions(entry.breastOptions)}</p>
+                            </div>
+                            
+                            {entry.unlatchReason && (
+                              <div className="bg-muted/20 p-2 rounded-md">
+                                <p className="text-xs text-muted-foreground">Unlatch Reason</p>
+                                <p className="text-sm font-medium">{entry.unlatchReason}</p>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {(entry.notes || entry.pumpNotes) && (
+                            <div className="mt-3 border-t pt-2 border-dashed border-muted">
+                              {entry.notes && (
+                                <div className="mb-2">
+                                  <p className="text-xs text-muted-foreground">Notes</p>
+                                  <p className="text-sm">{entry.notes}</p>
+                                </div>
+                              )}
+                              {entry.pumpNotes && (
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Pump Notes</p>
+                                  <p className="text-sm">{entry.pumpNotes}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div>
-                      <p className="text-sm font-medium">Date & Time</p>
-                      <p className="text-sm">
-                        {entry.dateTimeEntries[0]?.date
-                          ? (() => {
-                              try {
-                                const dateValue = typeof entry.dateTimeEntries[0].date === 'string' 
-                                  ? parseISO(entry.dateTimeEntries[0].date) 
-                                  : new Date(entry.dateTimeEntries[0].date);
-                                
-                                // Validate the date is valid before formatting
-                                if (isNaN(dateValue.getTime())) {
-                                  return "Invalid date";
-                                }
-                                
-                                return format(dateValue, "MMM d, yyyy");
-                              } catch (error) {
-                                console.error('Error formatting date:', error, entry.dateTimeEntries[0].date);
-                                return "Invalid date";
-                              }
-                            })()
-                          : "N/A"}{" "}
-                        at {entry.dateTimeEntries[0]?.time || "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Duration</p>
-                      <p className="text-sm">{entry.duration} minutes</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Breast</p>
-                      <p className="text-sm">{formatBreastOptions(entry.breastOptions)}</p>
-                    </div>
-                    {entry.unlatchReason && (
-                      <div>
-                        <p className="text-sm font-medium">Unlatch Reason</p>
-                        <p className="text-sm">{entry.unlatchReason}</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {(entry.notes || entry.pumpNotes) && (
-                    <div className="mt-2">
-                      {entry.notes && (
-                        <div className="mb-2">
-                          <p className="text-sm font-medium">Notes</p>
-                          <p className="text-sm">{entry.notes}</p>
-                        </div>
-                      )}
-                      {entry.pumpNotes && (
-                        <div>
-                          <p className="text-sm font-medium">Pump Notes</p>
-                          <p className="text-sm">{entry.pumpNotes}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              ))}
+                ));
+              })()}
             </div>
           </ScrollArea>
         ) : (

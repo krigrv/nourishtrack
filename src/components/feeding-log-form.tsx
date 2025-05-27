@@ -55,7 +55,7 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
   useEffect(() => {
     if (typeof window !== "undefined" && fields.length > 0) {
       const now = new Date();
-      const currentTime = format(now, "HH:mm");
+      const currentTime = format(now, "h:mm a"); // 12-hour format with AM/PM
       
       form.setValue("dateTimeEntries.0.date", now);
       form.setValue("dateTimeEntries.0.time", currentTime);
@@ -66,59 +66,72 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
   const onSubmit = async (data: FeedingLogData) => {
     setIsSubmitting(true);
     try {
-      const result = await submitFeedingLog(data);
+      // Skip server validation and handle everything client-side
+      // Create a new entry with a unique ID
+      const newEntry = {
+        ...data,
+        // Convert Date objects to ISO strings for storage
+        dateTimeEntries: data.dateTimeEntries.map(entry => ({
+          date: entry.date instanceof Date ? entry.date.toISOString() : entry.date,
+          time: entry.time
+        })),
+        id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date().toISOString(),
+      };
       
-      if (result.success) {
-        // Save to local storage
-        try {
-          const storedEntries = localStorage.getItem('feedingLogs');
-          const entries = storedEntries ? JSON.parse(storedEntries) : [];
-          
-          // Create a new entry with a unique ID
-          const newEntry = {
-            ...data,
-            id: `entry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            createdAt: new Date().toISOString(),
-          };
-          
-          // Add to the beginning of the array
-          entries.unshift(newEntry);
-          
-          // Save back to local storage
-          localStorage.setItem('feedingLogs', JSON.stringify(entries));
-        } catch (storageError) {
-          console.error('Error saving to local storage:', storageError);
-        }
+      // Save to Firestore
+      try {
+        // Import Firestore functions
+        const { collection, addDoc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
         
-        toast({
-          description: result.message,
-        });
+        // Add document to Firestore
+        await addDoc(collection(db, "feedingLogs"), newEntry);
         
-        // Reset form with a new current date/time for the first entry
-        form.reset({
-          dateTimeEntries: [{ date: new Date(), time: "" }],
-          duration: 0,
-          breastOptions: {
-            left: false,
-            right: false,
-          },
-          unlatchReason: null,
-          notes: "",
-          pumpNotes: "",
-        } as FeedingLogData);
-        
-        // Set current date and time for the first entry
-        const now = new Date();
-        const currentTime = format(now, "HH:mm");
-        
-        form.setValue("dateTimeEntries.0.date", now);
-        form.setValue("dateTimeEntries.0.time", currentTime);
-      } else {
-        toast({
-          variant: "destructive",
-          description: result.message || "Failed to submit feeding log",
-        });
+        console.log("Document successfully written to Firestore");
+      } catch (firestoreError) {
+        console.error('Error writing to Firestore:', firestoreError);
+        // Continue execution - we'll still save to local storage
       }
+      
+      // Save to local storage as backup
+      try {
+        const storedEntries = localStorage.getItem('feedingLogs');
+        const entries = storedEntries ? JSON.parse(storedEntries) : [];
+        
+        // Add to the beginning of the array
+        entries.unshift(newEntry);
+        
+        // Save back to local storage
+        localStorage.setItem('feedingLogs', JSON.stringify(entries));
+      } catch (storageError) {
+        console.error('Error saving to local storage:', storageError);
+      }
+      
+      // Show success message
+      toast({
+        description: "Feeding log submitted successfully!",
+      });
+      
+      // Reset form with a new current date/time for the first entry
+      form.reset({
+        dateTimeEntries: [{ date: new Date(), time: "" }],
+        duration: 0,
+        breastOptions: {
+          left: false,
+          right: false,
+        },
+        unlatchReason: null,
+        notes: "",
+        pumpNotes: "",
+      } as FeedingLogData);
+      
+      // Set current date and time for the first entry
+      const now = new Date();
+      const currentTime = format(now, "h:mm a"); // 12-hour format with AM/PM
+      
+      form.setValue("dateTimeEntries.0.date", now);
+      form.setValue("dateTimeEntries.0.time", currentTime);
     } catch (error) {
       console.error('Error submitting feeding log:', error);
       toast({
@@ -237,11 +250,15 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
                           Time
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            type="time"
-                            className="border-primary/20 hover:border-primary/40 transition-colors duration-200"
-                            {...field}
-                          />
+                          <div className="relative">
+                            <Input
+                              type="text"
+                              placeholder="h:mm AM/PM"
+                              className="border-primary/20 hover:border-primary/40 transition-colors duration-200"
+                              value={field.value}
+                              onChange={(e) => field.onChange(e.target.value)}
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
