@@ -6,7 +6,9 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
+    tsconfigPath: './tsconfig.json'
   },
+  transpilePackages: [],
   serverExternalPackages: [],
   webpack: (config) => {
     config.resolve.fallback = { fs: false };

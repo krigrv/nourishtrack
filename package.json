@@ -37,16 +37,16 @@
     "postcss": "^8.4.31",
     "autoprefixer": "^10.4.16",
     "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/node": "^20",
     "zod": "^3.25.28"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
-    "postcss-import": "^16.1.0",
-    "typescript": "^5"
+    "postcss-import": "^16.1.0"
   }
 }
