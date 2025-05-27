@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Baby, RefreshCw, PlusCircle, History } from "lucide-react";
+import { ImportUserLogs } from "@/components/import-user-logs";
 import { FeedingLogForm } from "@/components/feeding-log-form";
 import { PastEntries } from "@/components/past-entries";
 import { Button } from "@/components/ui/button";
@@ -34,10 +35,28 @@ export default function Home() {
     "Your presence is the greatest present for your baby."
   ];
   
-  // Set daily quote based on the day of the month
+  // Set a random quote on mount and handle URL hash for tabs
   useEffect(() => {
-    const quoteIndex = new Date().getDate() % quotes.length;
-    setDailyQuote(quotes[quoteIndex]);
+    // Set random quote
+    const randomIndex = Math.floor(Math.random() * quotes.length);
+    setDailyQuote(quotes[randomIndex]);
+    
+    // Check for hash in URL to set active tab
+    if (window.location.hash === '#past-logs') {
+      setActiveTab('past-logs');
+    }
+    
+    // Listen for hash changes
+    const handleHashChange = () => {
+      if (window.location.hash === '#past-logs') {
+        setActiveTab('past-logs');
+      } else if (window.location.hash === '#new-entry') {
+        setActiveTab('new-entry');
+      }
+    };
+    
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
   
   return (
@@ -92,6 +111,7 @@ export default function Home() {
               <TabsTrigger 
                 value="new-entry" 
                 className="flex items-center justify-center px-3 py-1.5 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary transition-all duration-200 -mb-px"
+                onClick={() => window.location.hash = 'new-entry'}
               >
                 <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
                 New Entry
@@ -100,6 +120,7 @@ export default function Home() {
               <TabsTrigger 
                 value="past-logs" 
                 className="flex items-center justify-center px-3 py-1.5 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary transition-all duration-200 -mb-px"
+                onClick={() => window.location.hash = 'past-logs'}
               >
                 <History className="h-3.5 w-3.5 mr-1.5" />
                 Past Logs
@@ -134,9 +155,12 @@ export default function Home() {
         </Tabs>
       </div>
       
+      {/* Import user logs component - will run once on page load */}
+      <ImportUserLogs />
+      
       {/* Footer Section */}
       <footer className="w-full text-center text-sm text-muted-foreground py-6 mt-auto border-t border-border/30">
-        <div className="max-w-md mx-auto px-4">
+        <div className="container max-w-md mx-auto px-4">
           <p className="mb-2">&copy; {currentYear} NourishTrack</p>
           <p className="text-xs opacity-70">Made with ❤️ by your lovely husband</p>
         </div>

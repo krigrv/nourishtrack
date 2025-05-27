@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from "react";
 import { format, parseISO, isAfter, isBefore, isEqual, startOfDay, endOfDay } from "date-fns";
 import { saveAs } from "file-saver";
-import { Calendar, Edit, Filter, Trash2, X, Download } from "lucide-react";
+import { Baby, Calendar, Clock, Edit, Filter, Info, Trash2, X, Download, Database } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { collection, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { addSampleLogsToFirestore, addSampleLogsToLocalStorage } from "@/scripts/add-sample-logs";
 
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -42,11 +44,15 @@ interface DateFilter {
   endDate: Date | null;
 }
 
-export function PastEntries({ onDelete }: PastEntriesProps) {
+export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
   const [entries, setEntries] = useState<FeedingLogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<FeedingLogEntry[]>([]);
   const [allEntries, setAllEntries] = useState<FeedingLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [isLoadingSamples, setIsLoadingSamples] = useState(false);
+  const [sampleLoadStatus, setSampleLoadStatus] = useState<{success: boolean, message: string} | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ startDate: null, endDate: null });
   const [editingEntry, setEditingEntry] = useState<FeedingLogEntry | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -311,10 +317,21 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
     setIsEditing(true);
 
     // Convert dates from string to Date objects for the form
-    const dateTimeEntries = entry.dateTimeEntries.map(dt => ({
-      date: typeof dt.date === 'string' ? new Date(dt.date) : dt.date,
-      time: dt.time
-    }));
+    const dateTimeEntries = entry.dateTimeEntries.map(dt => {
+      // Ensure date is in the correct format for the form
+      let dateValue;
+      if (typeof dt.date === 'string') {
+        dateValue = dt.date; // Keep as ISO string for the form
+      } else {
+        // Convert Date object to ISO string
+        dateValue = new Date(dt.date).toISOString();
+      }
+      
+      return {
+        date: dateValue,
+        time: dt.time
+      };
+    });
 
     // Set form values
     editForm.reset({
@@ -323,8 +340,8 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
       breastOptions: entry.breastOptions,
       // Ensure unlatchReason is one of the allowed values or null
       unlatchReason: unlatchReasons.includes(entry.unlatchReason as any) ? entry.unlatchReason as any : null,
-      notes: entry.notes,
-      pumpNotes: entry.pumpNotes
+      notes: entry.notes || "",
+      pumpNotes: entry.pumpNotes || ""
     });
   };
 
@@ -333,14 +350,22 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
     if (!editingEntry) return;
 
     try {
+      // Format the data properly for Firestore
+      const formattedData = {
+        ...data,
+        // Ensure dateTimeEntries is properly formatted
+        dateTimeEntries: data.dateTimeEntries.map((dt: any) => ({
+          date: dt.date, // Already in ISO string format from the form
+          time: dt.time
+        })),
+        // Keep the original createdAt timestamp
+        // but add an updatedAt timestamp
+        updatedAt: serverTimestamp()
+      };
+
       // Update in Firestore
       try {
-        await updateDoc(doc(db, "feedingLogs", editingEntry.id), {
-          ...data,
-          // Keep the original createdAt timestamp
-          // but add an updatedAt timestamp
-          updatedAt: serverTimestamp()
-        });
+        await updateDoc(doc(db, "feedingLogs", editingEntry.id), formattedData);
       } catch (error) {
         console.error('Error updating Firestore document:', error);
       }
@@ -354,7 +379,8 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
             if (entry.id === editingEntry.id) {
               return {
                 ...entry,
-                ...data,
+                ...formattedData,
+                // Use ISO string for local storage instead of server timestamp
                 updatedAt: new Date().toISOString()
               };
             }
@@ -371,7 +397,8 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
         if (entry.id === editingEntry.id) {
           return {
             ...entry,
-            ...data,
+            ...formattedData,
+            // Use ISO string for state update instead of server timestamp
             updatedAt: new Date().toISOString()
           };
         }
@@ -405,6 +432,81 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
     setFilteredEntries(allEntries);
   };
 
+  // Calculate analytics data
+  const calculateAnalytics = () => {
+    const dataToAnalyze = filteredEntries.length > 0 ? filteredEntries : allEntries;
+    
+    // Average feed duration
+    const totalDuration = dataToAnalyze.reduce((sum, entry) => sum + entry.duration, 0);
+    const avgDuration = dataToAnalyze.length > 0 ? Math.round(totalDuration / dataToAnalyze.length) : 0;
+    
+    // Calculate average feeds per day
+    let feedsPerDay = 0;
+    if (dataToAnalyze.length > 0) {
+      // Group entries by date
+      const feedsByDate: Record<string, number> = {};
+      dataToAnalyze.forEach(entry => {
+        if (entry.dateTimeEntries && entry.dateTimeEntries.length > 0) {
+          const dateStr = entry.dateTimeEntries[0].date.split('T')[0]; // Get YYYY-MM-DD format
+          feedsByDate[dateStr] = (feedsByDate[dateStr] || 0) + 1;
+        }
+      });
+      
+      // Calculate average
+      const totalDays = Object.keys(feedsByDate).length;
+      const totalFeeds = Object.values(feedsByDate).reduce((sum, count) => sum + count, 0);
+      feedsPerDay = totalDays > 0 ? Math.round((totalFeeds / totalDays) * 10) / 10 : 0; // Round to 1 decimal
+    }
+    
+    // Most used breast
+    let leftCount = 0;
+    let rightCount = 0;
+    dataToAnalyze.forEach(entry => {
+      if (entry.breastOptions?.left) leftCount++;
+      if (entry.breastOptions?.right) rightCount++;
+    });
+    const mostUsedBreast = leftCount > rightCount ? 'Left' : rightCount > leftCount ? 'Right' : 'Equal usage';
+    const breastUsageData = {
+      left: leftCount,
+      right: rightCount,
+      mostUsed: mostUsedBreast,
+      total: leftCount + rightCount
+    };
+    
+    // Most common unlatch reason
+    const unlatchReasons = dataToAnalyze
+      .filter(entry => entry.unlatchReason) // Filter out null/undefined reasons
+      .map(entry => entry.unlatchReason);
+    
+    const reasonCounts: Record<string, number> = {};
+    unlatchReasons.forEach(reason => {
+      if (reason) {
+        reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+      }
+    });
+    
+    let mostCommonReason = 'None recorded';
+    let maxCount = 0;
+    
+    Object.entries(reasonCounts).forEach(([reason, count]) => {
+      if (count > maxCount) {
+        mostCommonReason = reason;
+        maxCount = count;
+      }
+    });
+    
+    return {
+      avgDuration,
+      feedsPerDay,
+      breastUsageData,
+      mostCommonReason,
+      totalEntries: dataToAnalyze.length
+    };
+  };
+  
+  // Get analytics data
+  const analytics = calculateAnalytics();
+  
   // Export entries to CSV
   const exportToCSV = () => {
     try {
@@ -492,6 +594,92 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
       });
     }
   };
+  
+  // Load sample logs
+  const handleLoadSampleLogs = async () => {
+    try {
+      setIsLoadingSamples(true);
+      setSampleLoadStatus(null);
+      
+      // Add to Firestore
+      const firestoreResult = await addSampleLogsToFirestore();
+      
+      // Add to local storage (as backup)
+      if (typeof window !== 'undefined') {
+        addSampleLogsToLocalStorage();
+      }
+      
+      setSampleLoadStatus({
+        success: firestoreResult.success,
+        message: firestoreResult.message
+      });
+      
+      // Refresh logs to show the newly added sample data
+      // Re-fetch logs from Firestore
+      try {
+        setIsLoading(true);
+        const logsCollection = collection(db, "feedingLogs");
+        const q = query(logsCollection, orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        
+        const firestoreEntries: FeedingLogEntry[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          try {
+            const data = doc.data();
+            
+            // Skip invalid entries
+            if (!data) {
+              return; // Skip this entry
+            }
+            
+            firestoreEntries.push({
+              id: doc.id,
+              dateTimeEntries: data.dateTimeEntries || [{ date: new Date().toISOString(), time: "00:00" }],
+              duration: data.duration || 0,
+              breastOptions: data.breastOptions || { left: false, right: false },
+              unlatchReason: data.unlatchReason || null,
+              notes: data.notes || "",
+              pumpNotes: data.pumpNotes || "",
+              createdAt: data.createdAt?.toDate?.() 
+                ? data.createdAt.toDate().toISOString() 
+                : new Date().toISOString()
+            });
+          } catch (docError) {
+            console.error(`Error processing document ${doc.id}:`, docError);
+          }
+        });
+        
+        setEntries(firestoreEntries);
+        setAllEntries(firestoreEntries);
+        setFilteredEntries(firestoreEntries);
+        setIsLoading(false);
+      } catch (fetchError) {
+        console.error("Error fetching logs after adding samples:", fetchError);
+        setIsLoading(false);
+      }
+      
+      toast({
+        title: firestoreResult.success ? "Sample Logs Added" : "Error Adding Logs",
+        description: firestoreResult.message,
+        variant: firestoreResult.success ? "default" : "destructive"
+      });
+      
+      setIsLoadingSamples(false);
+    } catch (error) {
+      console.error('Error loading sample logs:', error);
+      setSampleLoadStatus({
+        success: false,
+        message: 'Failed to load sample logs. Please try again.'
+      });
+      toast({
+        title: "Error Adding Sample Logs",
+        description: "There was an error adding the sample logs.",
+        variant: "destructive"
+      });
+      setIsLoadingSamples(false);
+    }
+  };
 
   return (
     <Card>
@@ -503,16 +691,15 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
           </CardDescription>
         </div>
         <div className="flex items-center space-x-2">
-          {/* Export Button */}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 gap-1" 
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1"
             onClick={exportToCSV}
-            title="Export logs to CSV"
+            disabled={isExporting || entries.length === 0}
           >
             <Download className="h-3.5 w-3.5" />
-            <span>Export</span>
+            <span className="hidden sm:inline">Export CSV</span>
           </Button>
           
           {/* Date Filter Controls */}
@@ -560,6 +747,35 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
           </Popover>
         </div>
       </CardHeader>
+      
+      {/* Analytics - 2x2 Grid with Card Borders */}
+      <div className="grid grid-cols-2 gap-3 p-4 bg-muted/5 border-y border-border/20">
+        {/* Row 1 */}
+        <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
+          <Clock className="h-4 w-4 text-primary mb-1" />
+          <span className="text-xs text-muted-foreground">Average Duration</span>
+          <span className="text-sm font-medium">{analytics.avgDuration} min</span>
+        </div>
+        
+        <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
+          <Baby className="h-4 w-4 text-primary mb-1" />
+          <span className="text-xs text-muted-foreground">Most Used Breast</span>
+          <span className="text-sm font-medium">{analytics.breastUsageData.mostUsed}</span>
+        </div>
+        
+        {/* Row 2 */}
+        <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
+          <Info className="h-4 w-4 text-primary mb-1" />
+          <span className="text-xs text-muted-foreground">Common Unlatch</span>
+          <span className="text-sm font-medium">{analytics.mostCommonReason}</span>
+        </div>
+        
+        <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
+          <Calendar className="h-4 w-4 text-primary mb-1" />
+          <span className="text-xs text-muted-foreground">Feeds Per Day</span>
+          <span className="text-sm font-medium">{analytics.feedsPerDay}</span>
+        </div>
+      </div>
       
       {/* Filter Status */}
       {(dateFilter.startDate || dateFilter.endDate) && (
@@ -717,6 +933,58 @@ export function PastEntries({ onDelete }: PastEntriesProps) {
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={editForm.handleSubmit(saveEditedEntry)} className="space-y-4">
+              {/* Date and Time */}
+              <FormField
+                control={editForm.control}
+                name="dateTimeEntries.0.date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(new Date(field.value), "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? new Date(field.value) : undefined}
+                          onSelect={(date) => field.onChange(date?.toISOString())}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="dateTimeEntries.0.time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Time</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
               {/* Duration */}
               <FormField
                 control={editForm.control}
