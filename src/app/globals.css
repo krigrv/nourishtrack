@@ -56,3 +56,101 @@
     padding: 1rem;
   }
 }
+
+/* React Time Picker Styles */
+.react-time-picker {
+  display: inline-flex;
+  position: relative;
+  width: 100%;
+}
+
+.react-time-picker__wrapper {
+  display: flex;
+  flex-grow: 1;
+  flex-shrink: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  background-color: transparent;
+  transition: border-color 0.2s ease-in-out;
+}
+
+.react-time-picker__wrapper:hover {
+  border-color: hsl(var(--primary) / 0.4);
+}
+
+.react-time-picker__wrapper:focus-within {
+  border-color: hsl(var(--primary));
+  outline: 2px solid hsl(var(--ring) / 0.2);
+  outline-offset: 2px;
+}
+
+.react-time-picker__inputGroup {
+  min-width: calc(4ch + 1.5em);
+  flex-grow: 1;
+  padding: 0 2px;
+  box-sizing: content-box;
+  display: flex;
+  align-items: center;
+}
+
+.react-time-picker__inputGroup__input {
+  min-width: 0.8em;
+  height: 100%;
+  position: relative;
+  padding: 0 1px;
+  border: 0;
+  background: none;
+  color: hsl(var(--foreground));
+  font: inherit;
+  box-sizing: content-box;
+  -webkit-appearance: textfield;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.react-time-picker__inputGroup__input:focus {
+  outline: none;
+}
+
+.react-time-picker__inputGroup__input::-webkit-outer-spin-button,
+.react-time-picker__inputGroup__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.react-time-picker__inputGroup__divider {
+  padding: 0 2px;
+  color: hsl(var(--foreground));
+}
+
+.react-time-picker__inputGroup__amPm {
+  color: hsl(var(--foreground));
+  font: inherit;
+  -webkit-appearance: menulist;
+  -moz-appearance: menulist;
+  appearance: menulist;
+  background-color: transparent;
+  border: none;
+  padding: 0 2px;
+}
+
+.react-time-picker__button {
+  border: 0;
+  background: transparent;
+  padding: 4px 6px;
+  color: hsl(var(--muted-foreground));
+}
+
+.react-time-picker__button:hover {
+  color: hsl(var(--primary));
+}
+
+.react-time-picker__button:focus {
+  outline: none;
+}
+
+.react-time-picker__button svg {
+  stroke: currentColor;
+  stroke-width: 2;
+}

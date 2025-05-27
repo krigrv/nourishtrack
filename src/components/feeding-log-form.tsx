@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import { format } from "date-fns";
-import { Baby, Loader2, PlusCircle, Trash2, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { Baby, Loader2, PlusCircle, Trash2, Calendar as CalendarIcon, Clock, History } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TimePickerComponent } from "@/components/ui/time-picker";
 
 import { useToast } from "@/components/ui/use-toast";
 import { submitFeedingLog } from "@/app/actions";
@@ -226,11 +227,10 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={field.value}
+                              selected={field.value instanceof Date ? field.value : undefined}
                               onSelect={field.onChange}
                               initialFocus
                               // Allow any date - past, present, or future
-                              disabled={(date) => false}
                             />
                           </PopoverContent>
                         </Popover>
@@ -250,15 +250,10 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
                           Time
                         </FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <Input
-                              type="text"
-                              placeholder="h:mm AM/PM"
-                              className="border-primary/20 hover:border-primary/40 transition-colors duration-200"
-                              value={field.value}
-                              onChange={(e) => field.onChange(e.target.value)}
-                            />
-                          </div>
+                          <TimePickerComponent
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

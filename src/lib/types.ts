@@ -14,7 +14,9 @@ export const DateTimeEntrySchema = z.object({
       message: "Invalid date string",
     })
   ]),
-  time: z.string().min(1).regex(/^([01]\d|2[0-3]):([0-5]\d)$/),
+  time: z.string().min(1).regex(/^(([01]?\d|2[0-3]):([0-5]\d))|((1[0-2]|0?[1-9]):([0-5]\d)\s*(AM|PM|am|pm))$/, {
+    message: "Time must be in HH:MM format (24-hour) or h:mm AM/PM format (12-hour)",
+  }),
 });
 
 // Create breast options schema to support checkboxes

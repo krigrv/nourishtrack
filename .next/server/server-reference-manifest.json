@@ -1,28 +1,5 @@
 {
-  "node": {
-    "40cf029c762d02a18c071c2e9ebb188a7855f06a88": {
-      "workers": {
-        "app/page": {
-          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fkrishnagaurav%2FDocuments%2FGitHub%2Fnourishtrack%2Fsrc%2Fapp%2Factions.ts%22%2C%5B%7B%22id%22%3A%2240cf029c762d02a18c071c2e9ebb188a7855f06a88%22%2C%22exportedName%22%3A%22validateFeedingLog%22%7D%2C%7B%22id%22%3A%2240da112842510adc1d5f3ad000dde20b4b84c459f6%22%2C%22exportedName%22%3A%22submitFeedingLog%22%7D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        }
-      },
-      "layer": {
-        "app/page": "action-browser"
-      }
-    },
-    "40da112842510adc1d5f3ad000dde20b4b84c459f6": {
-      "workers": {
-        "app/page": {
-          "moduleId": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22%2FUsers%2Fkrishnagaurav%2FDocuments%2FGitHub%2Fnourishtrack%2Fsrc%2Fapp%2Factions.ts%22%2C%5B%7B%22id%22%3A%2240cf029c762d02a18c071c2e9ebb188a7855f06a88%22%2C%22exportedName%22%3A%22validateFeedingLog%22%7D%2C%7B%22id%22%3A%2240da112842510adc1d5f3ad000dde20b4b84c459f6%22%2C%22exportedName%22%3A%22submitFeedingLog%22%7D%5D%5D%5D&__client_imported__=true!",
-          "async": false
-        }
-      },
-      "layer": {
-        "app/page": "action-browser"
-      }
-    }
-  },
+  "node": {},
   "edge": {},
   "encryptionKey": "8AMpe7jpzY/VPlmhpYeebWtkHk4tkgkZAK2Lu4dPZss="
 }
