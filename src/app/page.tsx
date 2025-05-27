@@ -107,19 +107,18 @@ export default function Home() {
           className="w-full"
         >
           <div className="border-b border-border/50 mb-4">
-            <TabsList className="flex w-full mb-0 bg-transparent space-x-0 h-9">
+            <TabsList className="grid grid-cols-2 w-full mb-0 bg-transparent h-9 gap-0">
               <TabsTrigger 
                 value="new-entry" 
-                className="flex items-center justify-center px-3 py-1.5 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary transition-all duration-200 -mb-px"
+                className="flex items-center justify-center px-3 py-1.5 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary transition-all duration-200 -mb-px w-full"
                 onClick={() => window.location.hash = 'new-entry'}
               >
                 <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
                 New Entry
               </TabsTrigger>
-              <div className="h-5 w-px bg-border/50 self-center mx-1"></div>
               <TabsTrigger 
                 value="past-logs" 
-                className="flex items-center justify-center px-3 py-1.5 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary transition-all duration-200 -mb-px"
+                className="flex items-center justify-center px-3 py-1.5 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary transition-all duration-200 -mb-px w-full"
                 onClick={() => window.location.hash = 'past-logs'}
               >
                 <History className="h-3.5 w-3.5 mr-1.5" />

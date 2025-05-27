@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { format, parseISO, isAfter, isBefore, isEqual, startOfDay, endOfDay } from "date-fns";
 import { saveAs } from "file-saver";
-import { Baby, Calendar, Clock, Edit, Filter, Info, Trash2, X, Download, Database } from "lucide-react";
+import { Baby, Calendar as CalendarIcon, Clock, Edit, Filter, Info, Trash2, X, Download, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { collection, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -44,6 +44,13 @@ interface DateFilter {
   endDate: Date | null;
 }
 
+interface EnhancedFilter extends DateFilter {
+  minDuration: number | null;
+  maxDuration: number | null;
+  breastSide: 'all' | 'left' | 'right' | 'both' | null;
+  unlatchReason: string | null;
+}
+
 export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
   const [entries, setEntries] = useState<FeedingLogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<FeedingLogEntry[]>([]);
@@ -53,7 +60,36 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
   const [exportError, setExportError] = useState<string | null>(null);
   const [isLoadingSamples, setIsLoadingSamples] = useState(false);
   const [sampleLoadStatus, setSampleLoadStatus] = useState<{success: boolean, message: string} | null>(null);
-  const [dateFilter, setDateFilter] = useState<DateFilter>({ startDate: null, endDate: null });
+  // State for temporary filter (what's shown in the UI)
+  const [tempFilter, setTempFilter] = useState<EnhancedFilter>({
+    startDate: null,
+    endDate: null,
+    minDuration: null,
+    maxDuration: null,
+    breastSide: null,
+    unlatchReason: null
+  });
+  
+  // State for applied filter (what's actually used for filtering)
+  const [appliedFilter, setAppliedFilter] = useState<EnhancedFilter>({
+    startDate: null,
+    endDate: null,
+    minDuration: null,
+    maxDuration: null,
+    breastSide: null,
+    unlatchReason: null
+  });
+  
+  // For backward compatibility with existing code
+  const tempDateFilter = tempFilter;
+  const setTempDateFilter = (filter: DateFilter) => {
+    setTempFilter(prev => ({ ...prev, ...filter }));
+  };
+  
+  const appliedDateFilter = appliedFilter;
+  const setAppliedDateFilter = (filter: DateFilter) => {
+    setAppliedFilter(prev => ({ ...prev, ...filter }));
+  };
   const [editingEntry, setEditingEntry] = useState<FeedingLogEntry | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
@@ -269,22 +305,57 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
     }
   };
 
-  // Function to handle entry deletion
-  const handleDelete = async (id: string) => {
+  // State for delete confirmation dialog
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+
+  // Function to initiate delete process
+  const confirmDelete = (id: string) => {
+    setEntryToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  // Function to handle entry deletion after confirmation
+  const handleDelete = async () => {
+    if (!entryToDelete) return;
+    
+    const id = entryToDelete;
+    setDeleteConfirmOpen(false);
+    setEntryToDelete(null);
+    
     try {
+      // Optimistic UI update - remove from state immediately
+      const entryToRemove = entries.find(entry => entry.id === id);
+      const updatedEntries = entries.filter(entry => entry.id !== id);
+      setEntries(updatedEntries);
+      setFilteredEntries(filteredEntries.filter(entry => entry.id !== id));
+      setAllEntries(allEntries.filter(entry => entry.id !== id));
+      
+      // Show toast immediately
+      const toastId = toast({
+        description: "Deleting feeding log...",
+      });
+      
       // Delete from Firestore
       try {
+        console.log(`Deleting document with ID: ${id} from Firestore`);
         await deleteDoc(doc(db, "feedingLogs", id));
+        console.log('Successfully deleted document from Firestore');
       } catch (error) {
         console.error('Error deleting from Firestore:', error);
+        // Rollback UI state on error
+        if (entryToRemove) {
+          setEntries([...updatedEntries, entryToRemove]);
+          setFilteredEntries(prev => entryToRemove ? [...prev, entryToRemove] : prev);
+          setAllEntries(prev => entryToRemove ? [...prev, entryToRemove] : prev);
+        }
+        throw error;
       }
       
       // Call the parent component's onDelete function (for local storage)
       await onDelete(id);
       
-      // Update state
-      setEntries(entries.filter(entry => entry.id !== id));
-      
+      // Update toast to success
       toast({
         description: "Feeding log deleted successfully",
       });
@@ -297,9 +368,18 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
     }
   };
 
-  // Apply date filters to entries
-  const applyDateFilter = () => {
-    if (!dateFilter.startDate && !dateFilter.endDate) {
+  // Apply all filters to entries
+  const applyFilters = () => {
+    // Apply the temporary filter to the actual filter
+    setAppliedFilter(tempFilter);
+    
+    // Check if any filters are active
+    const hasDateFilter = tempFilter.startDate || tempFilter.endDate;
+    const hasDurationFilter = tempFilter.minDuration || tempFilter.maxDuration;
+    const hasBreastFilter = tempFilter.breastSide && tempFilter.breastSide !== 'all';
+    const hasUnlatchFilter = tempFilter.unlatchReason && tempFilter.unlatchReason !== 'none';
+    
+    if (!hasDateFilter && !hasDurationFilter && !hasBreastFilter && !hasUnlatchFilter) {
       // No filters, show all entries
       setFilteredEntries(allEntries);
       return;
@@ -314,12 +394,39 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         : new Date(entry.createdAt);
 
       // Check start date filter
-      if (dateFilter.startDate && !isAfter(entryDate, startOfDay(dateFilter.startDate)) && !isEqual(entryDate, dateFilter.startDate)) {
+      if (tempFilter.startDate && !isAfter(entryDate, startOfDay(tempFilter.startDate)) && !isEqual(entryDate, tempFilter.startDate)) {
         return false;
       }
 
       // Check end date filter
-      if (dateFilter.endDate && !isBefore(entryDate, endOfDay(dateFilter.endDate)) && !isEqual(entryDate, dateFilter.endDate)) {
+      if (tempFilter.endDate && !isBefore(entryDate, endOfDay(tempFilter.endDate)) && !isEqual(entryDate, tempFilter.endDate)) {
+        return false;
+      }
+      
+      // Check duration filters
+      if (tempFilter.minDuration !== null && entry.duration < tempFilter.minDuration) {
+        return false;
+      }
+      
+      if (tempFilter.maxDuration !== null && entry.duration > tempFilter.maxDuration) {
+        return false;
+      }
+      
+      // Check breast side filter
+      if (hasBreastFilter) {
+        if (tempFilter.breastSide === 'left' && !entry.breastOptions.left) {
+          return false;
+        }
+        if (tempFilter.breastSide === 'right' && !entry.breastOptions.right) {
+          return false;
+        }
+        if (tempFilter.breastSide === 'both' && (!entry.breastOptions.left || !entry.breastOptions.right)) {
+          return false;
+        }
+      }
+      
+      // Check unlatch reason filter
+      if (hasUnlatchFilter && entry.unlatchReason !== tempFilter.unlatchReason) {
         return false;
       }
 
@@ -327,12 +434,78 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
     });
 
     setFilteredEntries(filtered);
+    console.log(`Applied filters: ${JSON.stringify(tempFilter, null, 2)}`);
+    console.log(`Filtered entries: ${filtered.length} of ${allEntries.length}`);
   };
+  
+  // For backward compatibility
+  const applyDateFilter = applyFilters;
 
-  // Apply filters when filter changes
+  // Apply filters when applied filter changes
   useEffect(() => {
-    applyDateFilter();
-  }, [dateFilter, allEntries]);
+    // Check if any filters are active
+    const hasDateFilter = appliedFilter.startDate || appliedFilter.endDate;
+    const hasDurationFilter = appliedFilter.minDuration || appliedFilter.maxDuration;
+    const hasBreastFilter = appliedFilter.breastSide && appliedFilter.breastSide !== 'all';
+    const hasUnlatchFilter = appliedFilter.unlatchReason && appliedFilter.unlatchReason !== 'none';
+    
+    if (hasDateFilter || hasDurationFilter || hasBreastFilter || hasUnlatchFilter) {
+      // Only auto-apply filters when they're already set
+      const filtered = allEntries.filter(entry => {
+        // Get the date from the first dateTimeEntry
+        const entryDate = entry.dateTimeEntries[0]?.date
+          ? new Date(typeof entry.dateTimeEntries[0].date === 'string'
+            ? entry.dateTimeEntries[0].date
+            : entry.dateTimeEntries[0].date)
+          : new Date(entry.createdAt);
+  
+        // Check start date filter
+        if (appliedFilter.startDate && !isAfter(entryDate, startOfDay(appliedFilter.startDate)) && !isEqual(entryDate, appliedFilter.startDate)) {
+          return false;
+        }
+  
+        // Check end date filter
+        if (appliedFilter.endDate && !isBefore(entryDate, endOfDay(appliedFilter.endDate)) && !isEqual(entryDate, appliedFilter.endDate)) {
+          return false;
+        }
+        
+        // Check duration filters
+        if (appliedFilter.minDuration !== null && entry.duration < appliedFilter.minDuration) {
+          return false;
+        }
+        
+        if (appliedFilter.maxDuration !== null && entry.duration > appliedFilter.maxDuration) {
+          return false;
+        }
+        
+        // Check breast side filter
+        if (hasBreastFilter) {
+          if (appliedFilter.breastSide === 'left' && !entry.breastOptions.left) {
+            return false;
+          }
+          if (appliedFilter.breastSide === 'right' && !entry.breastOptions.right) {
+            return false;
+          }
+          if (appliedFilter.breastSide === 'both' && (!entry.breastOptions.left || !entry.breastOptions.right)) {
+            return false;
+          }
+        }
+        
+        // Check unlatch reason filter
+        if (hasUnlatchFilter && entry.unlatchReason !== appliedFilter.unlatchReason) {
+          return false;
+        }
+  
+        return true;
+      });
+  
+      setFilteredEntries(filtered);
+      console.log(`Applied filters from effect: ${JSON.stringify(appliedFilter, null, 2)}`);
+      console.log(`Filtered entries: ${filtered.length} of ${allEntries.length}`);
+    } else {
+      setFilteredEntries(allEntries);
+    }
+  }, [appliedFilter, allEntries]);
 
   // Fetch entries when component mounts
   useEffect(() => {
@@ -374,8 +547,8 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
       dateTimeEntries,
       duration: entry.duration,
       breastOptions: entry.breastOptions,
-      // Ensure unlatchReason is one of the allowed values or null
-      unlatchReason: unlatchReasons.includes(entry.unlatchReason as any) ? entry.unlatchReason as any : null,
+      // Ensure unlatchReason is one of the allowed values or 'none'
+      unlatchReason: unlatchReasons.includes(entry.unlatchReason as any) ? entry.unlatchReason as any : 'none',
       notes: entry.notes || "",
       pumpNotes: entry.pumpNotes || ""
     });
@@ -389,6 +562,8 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
       // Format the data properly for Firestore
       const formattedData = {
         ...data,
+        // Handle the 'none' value for unlatchReason
+        unlatchReason: data.unlatchReason === 'none' ? null : data.unlatchReason,
         // Ensure dateTimeEntries is properly formatted
         dateTimeEntries: data.dateTimeEntries.map((dt: any) => ({
           date: dt.date, // Already in ISO string format from the form
@@ -401,7 +576,10 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
 
       // Update in Firestore
       try {
+        console.log('Saving edited entry to Firestore:', JSON.stringify(formattedData, null, 2));
+        console.log('Document ID:', editingEntry.id);
         await updateDoc(doc(db, "feedingLogs", editingEntry.id), formattedData);
+        console.log('Successfully updated document in Firestore');
       } catch (error) {
         console.error('Error updating Firestore document:', error);
       }
@@ -462,9 +640,24 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
     }
   };
 
-  // Clear date filters
+  // Clear all filters
   const clearFilters = () => {
-    setDateFilter({ startDate: null, endDate: null });
+    setTempFilter({
+      startDate: null,
+      endDate: null,
+      minDuration: null,
+      maxDuration: null,
+      breastSide: null,
+      unlatchReason: null
+    });
+    setAppliedFilter({
+      startDate: null,
+      endDate: null,
+      minDuration: null,
+      maxDuration: null,
+      breastSide: null,
+      unlatchReason: null
+    });
     setFilteredEntries(allEntries);
   };
 
@@ -657,33 +850,42 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         const logsCollection = collection(db, "feedingLogs");
         const q = query(logsCollection, orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
+        console.log(`Retrieved ${querySnapshot.size} documents from Firestore`);
         
         const firestoreEntries: FeedingLogEntry[] = [];
         
         querySnapshot.forEach((doc) => {
-          try {
-            const data = doc.data();
-            
-            // Skip invalid entries
-            if (!data) {
-              return; // Skip this entry
-            }
-            
-            firestoreEntries.push({
-              id: doc.id,
-              dateTimeEntries: data.dateTimeEntries || [{ date: new Date().toISOString(), time: "00:00" }],
-              duration: data.duration || 0,
-              breastOptions: data.breastOptions || { left: false, right: false },
-              unlatchReason: data.unlatchReason || null,
-              notes: data.notes || "",
-              pumpNotes: data.pumpNotes || "",
-              createdAt: data.createdAt?.toDate?.() 
-                ? data.createdAt.toDate().toISOString() 
-                : new Date().toISOString()
-            });
-          } catch (docError) {
-            console.error(`Error processing document ${doc.id}:`, docError);
+          const data = doc.data();
+          console.log(`Processing document ${doc.id} from Firestore:`, JSON.stringify(data, null, 2));
+          
+          // Skip invalid entries
+          if (!data) {
+            console.log(`Skipping document ${doc.id} - no data`);
+            return;
           }
+          
+          // Process date and time from Firestore
+          // This ensures we have a consistent format
+          const dateTimeEntries = data.dateTimeEntries || [{
+            date: data.date || new Date().toISOString(),
+            time: data.time || "00:00"
+          }];
+          
+          const entry: FeedingLogEntry = {
+            id: doc.id,
+            dateTimeEntries,
+            duration: data.duration || 0,
+            breastOptions: data.breastOptions || { left: false, right: false },
+            unlatchReason: data.unlatchReason || null,
+            notes: data.notes || "",
+            pumpNotes: data.pumpNotes || "",
+            createdAt: data.createdAt?.toDate?.() 
+              ? data.createdAt.toDate().toISOString() 
+              : new Date().toISOString()
+          };
+          
+          console.log(`Processed entry for document ${doc.id}:`, JSON.stringify(entry, null, 2));
+          firestoreEntries.push(entry);
         });
         
         setEntries(firestoreEntries);
@@ -744,39 +946,118 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
               <Button variant="outline" size="sm" className="h-8 gap-1">
                 <Filter className="h-3.5 w-3.5" />
                 <span>Filter</span>
-                {(dateFilter.startDate || dateFilter.endDate) && (
+                {(tempDateFilter.startDate || tempDateFilter.endDate) && (
                   <span className="ml-1 rounded-full bg-primary w-2 h-2" />
                 )}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-4" align="end">
               <div className="space-y-4">
-                <h4 className="font-medium text-sm">Date Range</h4>
-                <div className="grid gap-2">
-                  <div className="grid gap-1">
-                    <label className="text-xs">Start Date</label>
-                    <CalendarComponent
-                      mode="single"
-                      selected={dateFilter.startDate || undefined}
-                      onSelect={(date) => setDateFilter({ ...dateFilter, startDate: date || null })}
-                      className="border rounded-md p-3"
-                    />
-                  </div>
-                  <div className="grid gap-1">
-                    <label className="text-xs">End Date</label>
-                    <CalendarComponent
-                      mode="single"
-                      selected={dateFilter.endDate || undefined}
-                      onSelect={(date) => setDateFilter({ ...dateFilter, endDate: date || null })}
-                      className="border rounded-md p-3"
-                    />
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Date Range</h4>
+                  <div className="grid gap-2">
+                    <div className="grid gap-1">
+                      <label className="text-xs">Start Date</label>
+                      <CalendarComponent
+                        mode="single"
+                        selected={tempFilter.startDate || undefined}
+                        onSelect={(date) => setTempFilter({ ...tempFilter, startDate: date || null })}
+                        className="border rounded-md p-3"
+                      />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-xs">End Date</label>
+                      <CalendarComponent
+                        mode="single"
+                        selected={tempFilter.endDate || undefined}
+                        onSelect={(date) => setTempFilter({ ...tempFilter, endDate: date || null })}
+                        className="border rounded-md p-3"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="flex justify-between">
+                
+                <div className="space-y-2 border-t pt-2">
+                  <h4 className="font-medium text-sm">Duration (minutes)</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="grid gap-1">
+                      <label className="text-xs">Minimum</label>
+                      <Input 
+                        type="number" 
+                        value={tempFilter.minDuration || ''}
+                        onChange={(e) => setTempFilter({ 
+                          ...tempFilter, 
+                          minDuration: e.target.value ? parseInt(e.target.value) : null 
+                        })}
+                        className="h-8"
+                        min="0"
+                      />
+                    </div>
+                    <div className="grid gap-1">
+                      <label className="text-xs">Maximum</label>
+                      <Input 
+                        type="number" 
+                        value={tempFilter.maxDuration || ''}
+                        onChange={(e) => setTempFilter({ 
+                          ...tempFilter, 
+                          maxDuration: e.target.value ? parseInt(e.target.value) : null 
+                        })}
+                        className="h-8"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 border-t pt-2">
+                  <h4 className="font-medium text-sm">Breast Side</h4>
+                  <Select
+                    value={tempFilter.breastSide || 'all'}
+                    onValueChange={(value) => setTempFilter({ 
+                      ...tempFilter, 
+                      breastSide: value === 'all' ? null : value as 'left' | 'right' | 'both' 
+                    })}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select side" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sides</SelectItem>
+                      <SelectItem value="left">Left Only</SelectItem>
+                      <SelectItem value="right">Right Only</SelectItem>
+                      <SelectItem value="both">Both Sides</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2 border-t pt-2">
+                  <h4 className="font-medium text-sm">Unlatch Reason</h4>
+                  <Select
+                    value={tempFilter.unlatchReason || 'none'}
+                    onValueChange={(value) => setTempFilter({ 
+                      ...tempFilter, 
+                      unlatchReason: value === 'none' ? null : value 
+                    })}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Any Reason</SelectItem>
+                      {unlatchReasons.map((reason) => (
+                        <SelectItem key={reason} value={reason}>
+                          {reason.charAt(0).toUpperCase() + reason.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex justify-between pt-2">
                   <Button variant="outline" size="sm" onClick={clearFilters}>
-                    Clear
+                    Clear All
                   </Button>
-                  <Button size="sm" onClick={() => applyDateFilter()}>Apply</Button>
+                  <Button size="sm" onClick={() => applyFilters()}>Apply Filters</Button>
                 </div>
               </div>
             </PopoverContent>
@@ -807,48 +1088,76 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         </div>
         
         <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
-          <Calendar className="h-4 w-4 text-primary mb-1" />
+          <CalendarIcon className="h-4 w-4 text-primary mb-1" />
           <span className="text-xs text-muted-foreground">Feeds Per Day</span>
           <span className="text-sm font-medium">{analytics.feedsPerDay}</span>
         </div>
       </div>
       
       {/* Filter Status */}
-      {(dateFilter.startDate || dateFilter.endDate) && (
-        <div className="px-6 py-2 bg-muted/50 flex items-center justify-between">
-          <span className="text-sm">
-            Filtering: 
-            {dateFilter.startDate && (
-              <span className="font-medium"> From {
-                (() => {
-                  try {
-                    return isNaN(dateFilter.startDate.getTime()) 
-                      ? "Invalid date" 
-                      : format(dateFilter.startDate, "MMM d, yyyy");
-                  } catch (error) {
-                    console.error('Error formatting start date:', error);
-                    return "Invalid date";
-                  }
-                })()
-              }</span>
+      {(appliedFilter.startDate || appliedFilter.endDate || appliedFilter.minDuration || appliedFilter.maxDuration || 
+        appliedFilter.breastSide || appliedFilter.unlatchReason) && (
+        <div className="px-6 py-2 bg-muted/50 flex flex-wrap items-center justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">Filters:</span>
+            
+            {/* Date filters */}
+            {(appliedFilter.startDate || appliedFilter.endDate) && (
+              <div className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold">
+                <span>
+                  Date: 
+                  {appliedFilter.startDate && (
+                    <span>From {format(appliedFilter.startDate, "MMM d, yyyy")}</span>
+                  )}
+                  {appliedFilter.startDate && appliedFilter.endDate && " "}
+                  {appliedFilter.endDate && (
+                    <span>To {format(appliedFilter.endDate, "MMM d, yyyy")}</span>
+                  )}
+                </span>
+              </div>
             )}
-            {dateFilter.endDate && (
-              <span className="font-medium"> To {
-                (() => {
-                  try {
-                    return isNaN(dateFilter.endDate.getTime()) 
-                      ? "Invalid date" 
-                      : format(dateFilter.endDate, "MMM d, yyyy");
-                  } catch (error) {
-                    console.error('Error formatting end date:', error);
-                    return "Invalid date";
-                  }
-                })()
-              }</span>
+            
+            {/* Duration filters */}
+            {(appliedFilter.minDuration !== null || appliedFilter.maxDuration !== null) && (
+              <div className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold">
+                <span>
+                  Duration: 
+                  {appliedFilter.minDuration !== null && (
+                    <span>Min {appliedFilter.minDuration}min</span>
+                  )}
+                  {appliedFilter.minDuration !== null && appliedFilter.maxDuration !== null && " - "}
+                  {appliedFilter.maxDuration !== null && (
+                    <span>Max {appliedFilter.maxDuration}min</span>
+                  )}
+                </span>
+              </div>
             )}
-            {" "} ({filteredEntries.length} results)
-          </span>
-          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-7 w-7">
+            
+            {/* Breast side filter */}
+            {appliedFilter.breastSide && (
+              <div className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold">
+                <span>
+                  Breast: 
+                  {appliedFilter.breastSide === 'left' && "Left Only"}
+                  {appliedFilter.breastSide === 'right' && "Right Only"}
+                  {appliedFilter.breastSide === 'both' && "Both Sides"}
+                </span>
+              </div>
+            )}
+            
+            {/* Unlatch reason filter */}
+            {appliedFilter.unlatchReason && (
+              <div className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold">
+                <span>
+                  Unlatch: {appliedFilter.unlatchReason.charAt(0).toUpperCase() + appliedFilter.unlatchReason.slice(1)}
+                </span>
+              </div>
+            )}
+            
+            <span className="text-xs text-muted-foreground ml-1">({filteredEntries.length} results)</span>
+          </div>
+          
+          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-7 w-7" aria-label="Clear all filters">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -909,7 +1218,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                 
                 return sortedGroups.map(dateKey => (
                   <div key={dateKey} className="space-y-3">
-                    <h3 className="text-sm font-semibold px-1 py-2 bg-muted/30 rounded-md sticky top-0 z-10">
+                    <h3 className="text-sm font-semibold px-1 py-2 bg-muted/30 rounded-md relative">
                       {(groupedEntries[dateKey] as any).displayDate}
                     </h3>
                     
@@ -930,7 +1239,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7"
-                              onClick={() => handleDelete(entry.id)}
+                              onClick={() => confirmDelete(entry.id)}
                               aria-label="Delete entry"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -988,7 +1297,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         ) : (
           <div className="text-center py-8">
             <p className="text-muted-foreground">
-              {dateFilter.startDate || dateFilter.endDate 
+              {appliedDateFilter.startDate || appliedDateFilter.endDate 
                 ? "No feeding logs found for the selected date range" 
                 : "No feeding logs found"}
             </p>
@@ -996,6 +1305,22 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         )}
       </CardContent>
       
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this feeding log entry? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Dialog */}
       <Dialog open={isEditing} onOpenChange={(open) => !open && setIsEditing(false)}>
         <DialogContent className="sm:max-w-[425px]">
@@ -1029,19 +1354,24 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                             ) : (
                               <span>Pick a date</span>
                             )}
-                            <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
+                        <CalendarComponent
                           mode="single"
                           selected={field.value ? new Date(field.value) : undefined}
-                          onSelect={(date) => field.onChange(date?.toISOString())}
+                          onSelect={(date) => {
+                            if (date) {
+                              field.onChange(date.toISOString());
+                            }
+                          }}
                           initialFocus
                         />
                       </PopoverContent>
                     </Popover>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1055,6 +1385,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                     <FormControl>
                       <Input type="time" {...field} />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1069,6 +1400,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                     <FormControl>
                       <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1087,10 +1419,12 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                             type="checkbox"
                             checked={field.value}
                             onChange={field.onChange}
+                            id="breast-left"
                             className="h-4 w-4 rounded border-gray-300"
                           />
                         </FormControl>
-                        <FormLabel className="text-sm font-normal">Left</FormLabel>
+                        <FormLabel htmlFor="breast-left" className="text-sm font-normal">Left</FormLabel>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -1104,10 +1438,12 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                             type="checkbox"
                             checked={field.value}
                             onChange={field.onChange}
+                            id="breast-right"
                             className="h-4 w-4 rounded border-gray-300"
                           />
                         </FormControl>
-                        <FormLabel className="text-sm font-normal">Right</FormLabel>
+                        <FormLabel htmlFor="breast-right" className="text-sm font-normal">Right</FormLabel>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -1131,7 +1467,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {unlatchReasons.map((reason) => (
                           <SelectItem key={reason} value={reason}>
                             {reason.charAt(0).toUpperCase() + reason.slice(1)}
@@ -1139,6 +1475,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1153,6 +1490,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                     <FormControl>
                       <Textarea {...field} value={field.value || ""} />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1167,6 +1505,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                     <FormControl>
                       <Textarea {...field} value={field.value || ""} />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
