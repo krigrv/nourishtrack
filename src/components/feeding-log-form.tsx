@@ -164,29 +164,19 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
           <form onSubmit={form.handleSubmit((data) => onSubmit(data as FeedingLogData))} className="space-y-6">
             {/* Date/Time Fields */}
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6 border-b border-border/30 pb-3">
-                <h3 className="text-lg font-medium flex items-center">
-                  <span className="p-1.5 rounded-full bg-primary/10 mr-2 inline-flex">
-                    <CalendarIcon className="h-4 w-4 text-primary" />
+              <div className="flex items-center mb-3 border-b border-border/30 pb-2">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center">
+                  <span className="p-1 rounded-full bg-primary/10 mr-1.5 inline-flex">
+                    <CalendarIcon className="h-3 w-3 text-primary" />
                   </span>
                   Feeding Times
                 </h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addNewEntry}
-                  className="h-8 px-3 hover:bg-primary/5 transition-colors duration-200 border-primary/20 hover:border-primary/30"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Time
-                </Button>
               </div>
               
               {fields.map((field, index) => (
                 <div 
                   key={field.id} 
-                  className="relative flex flex-col gap-4 rounded-lg border border-border/50 p-4 md:flex-row bg-card/30 hover:bg-card/50 transition-colors duration-200 shadow-sm group animate-fade-in"
+                  className="relative flex flex-col gap-2 border-l-2 border-l-primary/20 pl-3 py-2 mb-2 group"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="absolute -left-2 -top-2 bg-primary/10 rounded-full w-6 h-6 flex items-center justify-center text-xs font-medium text-primary border border-primary/20">
@@ -271,6 +261,20 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
                   )}
                 </div>
               ))}
+              
+              {/* Log Another Time Button */}
+              <div className="flex justify-center mt-2 mb-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addNewEntry}
+                  className="h-8 px-3 hover:bg-primary/5 transition-colors duration-200 border-primary/20 hover:border-primary/30 w-full"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Log Another Time
+                </Button>
+              </div>
             </div>
             
             {/* Duration Field */}
@@ -279,17 +283,18 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
               name="duration"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration (minutes)</FormLabel>
+                  <FormLabel className="text-sm font-medium">Duration (minutes)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
                       min={1}
                       max={240}
+                      className="h-9"
                       {...field}
                       onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                     />
                   </FormControl>
-                  <FormDescription>
+                  <FormDescription className="text-xs">
                     Enter the total duration in minutes (1-240)
                   </FormDescription>
                   <FormMessage />
@@ -298,24 +303,28 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
             />
             
             {/* Breast Options Field with Checkboxes */}
-            <div className="space-y-3">
-              <FormLabel>Breast</FormLabel>
-              <div className="flex flex-wrap gap-6">
+            <div className="space-y-2">
+              <FormLabel className="text-sm font-medium flex items-center gap-1.5">
+                <Baby className="h-3.5 w-3.5 text-muted-foreground" />
+                Breast Options
+              </FormLabel>
+              <div className="flex gap-4 bg-muted/30 p-2 rounded-md">
                 <FormField
                   control={form.control}
                   name="breastOptions.left"
                   render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2 m-0">
+                    <FormItem className="flex items-center space-x-2 space-y-0">
                       <FormControl>
                         <Checkbox
+                          id="breast-left"
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          id="breast-left"
+                          className="data-[state=checked]:bg-primary/80 data-[state=checked]:border-primary/80"
                         />
                       </FormControl>
                       <FormLabel 
                         htmlFor="breast-left" 
-                        className="font-normal capitalize cursor-pointer"
+                        className="text-sm font-normal capitalize cursor-pointer"
                       >
                         Left
                       </FormLabel>
@@ -326,17 +335,18 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
                   control={form.control}
                   name="breastOptions.right"
                   render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2 m-0">
+                    <FormItem className="flex items-center space-x-2 space-y-0">
                       <FormControl>
                         <Checkbox
+                          id="breast-right"
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          id="breast-right"
+                          className="data-[state=checked]:bg-primary/80 data-[state=checked]:border-primary/80"
                         />
                       </FormControl>
                       <FormLabel 
                         htmlFor="breast-right" 
-                        className="font-normal capitalize cursor-pointer"
+                        className="text-sm font-normal capitalize cursor-pointer"
                       >
                         Right
                       </FormLabel>
@@ -353,19 +363,19 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
               name="unlatchReason"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Unlatch Reason</FormLabel>
+                  <FormLabel className="text-sm font-medium">Unlatch Reason</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     value={field.value || undefined}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-9 text-sm border-primary/20 hover:border-primary/40 transition-colors duration-200">
                         <SelectValue placeholder="Select a reason" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {unlatchReasons.map((reason) => (
-                        <SelectItem key={reason} value={reason}>
+                        <SelectItem key={reason} value={reason} className="text-sm">
                           {reason.charAt(0).toUpperCase() + reason.slice(1)}
                         </SelectItem>
                       ))}
@@ -382,16 +392,16 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel className="text-sm font-medium">Notes</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Any additional notes about this feeding session"
-                      className="resize-none"
+                      className="resize-none h-20 text-sm border-primary/20 hover:border-primary/40 transition-colors duration-200"
                       {...field}
                       value={field.value || ""}
                     />
                   </FormControl>
-                  <FormDescription>
+                  <FormDescription className="text-xs">
                     Optional notes (max 500 characters)
                   </FormDescription>
                   <FormMessage />
@@ -405,16 +415,16 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
               name="pumpNotes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Pump Notes</FormLabel>
+                  <FormLabel className="text-sm font-medium">Pump Notes</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Notes about pumping (if applicable)"
-                      className="resize-none"
+                      className="resize-none h-20 text-sm border-primary/20 hover:border-primary/40 transition-colors duration-200"
                       {...field}
                       value={field.value || ""}
                     />
                   </FormControl>
-                  <FormDescription>
+                  <FormDescription className="text-xs">
                     Optional pump-related notes (max 500 characters)
                   </FormDescription>
                   <FormMessage />
@@ -429,7 +439,7 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
               disabled={isSubmitting}
               size="lg"
             >
-              <span className="relative z-10 flex items-center justify-center gap-2">
+              <span className="relative z-10 flex items-center justify-center gap-2 group-hover:scale-105 transition-transform duration-300">
                 {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -437,7 +447,7 @@ export function FeedingLogForm({ onTogglePastEntries, showPastEntries = false }:
                   </>
                 ) : (
                   <>
-                    <span className="group-hover:scale-105 transition-transform duration-300">Submit Feeding Log</span>
+                    <span>Submit Feeding Log</span>
                   </>
                 )}
               </span>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Baby, RefreshCw, PlusCircle, History } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { FeedingLogForm } from "@/components/feeding-log-form";
 import { PastEntries } from "@/components/past-entries";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,9 @@ export default function Home() {
       {/* Header Section */}
       <div className="w-full max-w-md mx-auto text-center mb-6 md:mb-8 animate-fade-in">
         <div className="flex justify-center items-center mb-3 relative">
+          <div className="absolute right-0 top-0">
+            <ThemeToggle />
+          </div>
           <div className="baby-icon-container p-3 rounded-full bg-primary/10 shadow-sm">
             <Baby className="h-10 w-10 md:h-12 md:w-12 text-primary baby-icon" aria-hidden="true" />
           </div>
@@ -75,7 +79,7 @@ export default function Home() {
       </div>
       
       {/* Main Content */}
-      <div className="w-full max-w-3xl mx-auto mb-8 px-1 sm:px-4">
+      <div className="w-full max-w-md mx-auto mb-8 px-1 sm:px-4">
         <Tabs 
           defaultValue="new-entry" 
           value={activeTab} 
@@ -87,22 +91,25 @@ export default function Home() {
           }}
           className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-2 mb-6 md:mb-8 rounded-xl p-1 shadow-sm bg-card border border-border/50">
-            <TabsTrigger 
-              value="new-entry" 
-              className="flex items-center justify-center rounded-lg transition-all duration-200 data-[state=active]:shadow-sm"
-            >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New Entry
-            </TabsTrigger>
-            <TabsTrigger 
-              value="past-logs" 
-              className="flex items-center justify-center rounded-lg transition-all duration-200 data-[state=active]:shadow-sm"
-            >
-              <History className="h-4 w-4 mr-2" />
-              Past Logs
-            </TabsTrigger>
-          </TabsList>
+          <div className="border-b border-border/50 mb-4">
+            <TabsList className="flex w-full mb-0 bg-transparent space-x-0 h-9">
+              <TabsTrigger 
+                value="new-entry" 
+                className="flex items-center justify-center px-3 py-1.5 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary transition-all duration-200 -mb-px"
+              >
+                <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+                New Entry
+              </TabsTrigger>
+              <div className="h-5 w-px bg-border/50 self-center mx-1"></div>
+              <TabsTrigger 
+                value="past-logs" 
+                className="flex items-center justify-center px-3 py-1.5 text-sm rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary transition-all duration-200 -mb-px"
+              >
+                <History className="h-3.5 w-3.5 mr-1.5" />
+                Past Logs
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="new-entry" className="mt-0">
             <FeedingLogForm />
