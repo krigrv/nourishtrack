@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Baby, RefreshCw, PlusCircle, History } from "lucide-react";
 import { ImportUserLogs } from "@/components/import-user-logs";
+import { ImportNewLogs } from "@/scripts/import-new-logs";
 import { FeedingLogForm } from "@/components/feeding-log-form";
 import { PastEntries } from "@/components/past-entries";
 import { Button } from "@/components/ui/button";
@@ -154,8 +155,11 @@ export default function Home() {
         </Tabs>
       </div>
       
-      {/* Import user logs component - will run once on page load */}
-      <ImportUserLogs />
+      {/* Import components */}
+      <div className="w-full max-w-md mx-auto mb-4 flex flex-col gap-2">
+        <ImportUserLogs />
+        <ImportNewLogs />
+      </div>
       
       {/* Footer Section */}
       <footer className="w-full text-center text-sm text-muted-foreground py-6 mt-auto border-t border-border/30">

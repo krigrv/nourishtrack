@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { collection, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { addSampleLogsToFirestore, addSampleLogsToLocalStorage } from "@/scripts/add-sample-logs";
+import { addNewLogsToFirestore, addNewLogsToLocalStorage } from "@/scripts/add-new-logs";
 
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -23,6 +24,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { FeedingLogSchema, unlatchReasons } from "@/lib/types";
+import { z } from "zod";
 
 interface PastEntriesProps {
   onDelete: (id: string) => Promise<void>;
@@ -47,7 +49,7 @@ interface DateFilter {
 interface EnhancedFilter extends DateFilter {
   minDuration: number | null;
   maxDuration: number | null;
-  breastSide: 'all' | 'left' | 'right' | 'both' | null;
+  breastSide: 'left' | 'right' | 'both' | null;
   unlatchReason: string | null;
 }
 
@@ -60,6 +62,13 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
   const [exportError, setExportError] = useState<string | null>(null);
   const [isLoadingSamples, setIsLoadingSamples] = useState(false);
   const [sampleLoadStatus, setSampleLoadStatus] = useState<{success: boolean, message: string} | null>(null);
+  const [isLoadingNewLogs, setIsLoadingNewLogs] = useState(false);
+  const [newLogsStatus, setNewLogsStatus] = useState<{success: boolean, message: string} | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentEditEntry, setCurrentEditEntry] = useState<FeedingLogEntry | null>(null);
+  
   // State for temporary filter (what's shown in the UI)
   const [tempFilter, setTempFilter] = useState<EnhancedFilter>({
     startDate: null,
@@ -90,8 +99,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
   const setAppliedDateFilter = (filter: DateFilter) => {
     setAppliedFilter(prev => ({ ...prev, ...filter }));
   };
-  const [editingEntry, setEditingEntry] = useState<FeedingLogEntry | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+
   const { toast } = useToast();
   
   // Initialize edit form
@@ -306,22 +314,21 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
   };
 
   // State for delete confirmation dialog
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+
 
   // Function to initiate delete process
   const confirmDelete = (id: string) => {
-    setEntryToDelete(id);
+    setPendingDeleteId(id);
     setDeleteConfirmOpen(true);
   };
 
   // Function to handle entry deletion after confirmation
   const handleDelete = async () => {
-    if (!entryToDelete) return;
+    if (!pendingDeleteId) return;
     
-    const id = entryToDelete;
+    const id = pendingDeleteId;
     setDeleteConfirmOpen(false);
-    setEntryToDelete(null);
+    setPendingDeleteId(null);
     
     try {
       // Optimistic UI update - remove from state immediately
@@ -376,7 +383,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
     // Check if any filters are active
     const hasDateFilter = tempFilter.startDate || tempFilter.endDate;
     const hasDurationFilter = tempFilter.minDuration || tempFilter.maxDuration;
-    const hasBreastFilter = tempFilter.breastSide && tempFilter.breastSide !== 'all';
+    const hasBreastFilter = tempFilter.breastSide !== null;
     const hasUnlatchFilter = tempFilter.unlatchReason && tempFilter.unlatchReason !== 'none';
     
     if (!hasDateFilter && !hasDurationFilter && !hasBreastFilter && !hasUnlatchFilter) {
@@ -446,7 +453,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
     // Check if any filters are active
     const hasDateFilter = appliedFilter.startDate || appliedFilter.endDate;
     const hasDurationFilter = appliedFilter.minDuration || appliedFilter.maxDuration;
-    const hasBreastFilter = appliedFilter.breastSide && appliedFilter.breastSide !== 'all';
+    const hasBreastFilter = appliedFilter.breastSide !== null;
     const hasUnlatchFilter = appliedFilter.unlatchReason && appliedFilter.unlatchReason !== 'none';
     
     if (hasDateFilter || hasDurationFilter || hasBreastFilter || hasUnlatchFilter) {
@@ -522,7 +529,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
 
   // Function to handle entry editing
   const handleEdit = async (entry: FeedingLogEntry) => {
-    setEditingEntry(entry);
+    setCurrentEditEntry(entry);
     setIsEditing(true);
 
     // Convert dates from string to Date objects for the form
@@ -556,7 +563,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
 
   // Function to save edited entry
   const saveEditedEntry = async (data: any) => {
-    if (!editingEntry) return;
+    if (!currentEditEntry) return;
 
     try {
       // Format the data properly for Firestore
@@ -577,8 +584,8 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
       // Update in Firestore
       try {
         console.log('Saving edited entry to Firestore:', JSON.stringify(formattedData, null, 2));
-        console.log('Document ID:', editingEntry.id);
-        await updateDoc(doc(db, "feedingLogs", editingEntry.id), formattedData);
+        console.log('Document ID:', currentEditEntry.id);
+        await updateDoc(doc(db, "feedingLogs", currentEditEntry.id), formattedData);
         console.log('Successfully updated document in Firestore');
       } catch (error) {
         console.error('Error updating Firestore document:', error);
@@ -590,7 +597,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         if (storedEntries) {
           const entries = JSON.parse(storedEntries);
           const updatedEntries = entries.map((entry: any) => {
-            if (entry.id === editingEntry.id) {
+            if (entry.id === currentEditEntry.id) {
               return {
                 ...entry,
                 ...formattedData,
@@ -608,7 +615,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
 
       // Update state
       const updatedEntries = allEntries.map(entry => {
-        if (entry.id === editingEntry.id) {
+        if (entry.id === currentEditEntry.id) {
           return {
             ...entry,
             ...formattedData,
@@ -627,7 +634,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
       });
 
       setIsEditing(false);
-      setEditingEntry(null);
+      setCurrentEditEntry(null);
 
       // Refresh data
       fetchEntriesFromFirestore();
@@ -676,7 +683,9 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
       const feedsByDate: Record<string, number> = {};
       dataToAnalyze.forEach(entry => {
         if (entry.dateTimeEntries && entry.dateTimeEntries.length > 0) {
-          const dateStr = entry.dateTimeEntries[0].date.split('T')[0]; // Get YYYY-MM-DD format
+          const dateStr = entry.dateTimeEntries[0]?.date 
+            ? format(new Date(entry.dateTimeEntries[0].date), "yyyy-MM-dd")
+            : "";
           feedsByDate[dateStr] = (feedsByDate[dateStr] || 0) + 1;
         }
       });
@@ -892,34 +901,104 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         setAllEntries(firestoreEntries);
         setFilteredEntries(firestoreEntries);
         setIsLoading(false);
-      } catch (fetchError) {
-        console.error("Error fetching logs after adding samples:", fetchError);
+      } catch (error) {
+        console.error("Error fetching entries from Firestore:", error);
         setIsLoading(false);
       }
+  };
+  
+  // Load sample logs
+  const handleLoadSampleLogs = async () => {
+    setIsLoadingSamples(true);
+    setSampleLoadStatus(null);
+    try {
+      // Try to add to Firestore first
+      let result;
+      try {
+        result = await addSampleLogsToFirestore();
+        console.log("Firestore sample logs result:", result);
+      } catch (error) {
+        console.error("Error adding sample logs to Firestore:", error);
+        // Fall back to localStorage if Firestore fails
+        result = addSampleLogsToLocalStorage();
+        console.log("Local storage sample logs result:", result);
+      }
       
+      setSampleLoadStatus(result);
+      
+      // Refresh the entries list
+      await fetchEntriesFromFirestore();
+      
+      // Show success toast
       toast({
-        title: firestoreResult.success ? "Sample Logs Added" : "Error Adding Logs",
-        description: firestoreResult.message,
-        variant: firestoreResult.success ? "default" : "destructive"
+        title: "Sample logs loaded",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
       });
-      
-      setIsLoadingSamples(false);
     } catch (error) {
-      console.error('Error loading sample logs:', error);
-      setSampleLoadStatus({
-        success: false,
-        message: 'Failed to load sample logs. Please try again.'
-      });
+    console.error("Error in handleLoadSampleLogs:", error);
+    setSampleLoadStatus({
+      success: false,
+      message: "Failed to load sample logs. See console for details."
+    });
+    
+    // Show error toast
+    toast({
+      title: "Error",
+      description: "Failed to load sample logs. See console for details.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoadingSamples(false);
+  };
+  
+  // Load new logs
+  const handleLoadNewLogs = async () => {
+    setIsLoadingNewLogs(true);
+    setNewLogsStatus(null);
+    try {
+      // Try to add to Firestore first
+      let result;
+      try {
+        result = await addNewLogsToFirestore();
+        console.log("Firestore new logs result:", result);
+      } catch (error) {
+        console.error("Error adding new logs to Firestore:", error);
+        // Fall back to localStorage if Firestore fails
+        result = addNewLogsToLocalStorage();
+        console.log("Local storage new logs result:", result);
+      }
+      
+      setNewLogsStatus(result);
+      
+      // Refresh the entries list
+      await fetchEntriesFromFirestore();
+      
+      // Show success toast
       toast({
-        title: "Error Adding Sample Logs",
-        description: "There was an error adding the sample logs.",
-        variant: "destructive"
+        title: "New logs loaded",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
       });
-      setIsLoadingSamples(false);
+    } catch (error) {
+      console.error("Error in handleLoadNewLogs:", error);
+      setNewLogsStatus({
+        success: false,
+        message: "Failed to load new logs. See console for details."
+      });
+      
+      // Show error toast
+      toast({
+        title: "Error",
+        description: "Failed to load new logs. See console for details.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingNewLogs(false);
     }
   };
-
-  return (
+  
+  return (<>
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
@@ -1065,35 +1144,6 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         </div>
       </CardHeader>
       
-      {/* Analytics - 2x2 Grid with Card Borders */}
-      <div className="grid grid-cols-2 gap-3 p-4 bg-muted/5 border-y border-border/20">
-        {/* Row 1 */}
-        <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
-          <Clock className="h-4 w-4 text-primary mb-1" />
-          <span className="text-xs text-muted-foreground">Average Duration</span>
-          <span className="text-sm font-medium">{analytics.avgDuration} min</span>
-        </div>
-        
-        <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
-          <Baby className="h-4 w-4 text-primary mb-1" />
-          <span className="text-xs text-muted-foreground">Most Used Breast</span>
-          <span className="text-sm font-medium">{analytics.breastUsageData.mostUsed}</span>
-        </div>
-        
-        {/* Row 2 */}
-        <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
-          <Info className="h-4 w-4 text-primary mb-1" />
-          <span className="text-xs text-muted-foreground">Common Unlatch</span>
-          <span className="text-sm font-medium">{analytics.mostCommonReason}</span>
-        </div>
-        
-        <div className="border rounded-md p-3 flex flex-col items-center justify-center text-center">
-          <CalendarIcon className="h-4 w-4 text-primary mb-1" />
-          <span className="text-xs text-muted-foreground">Feeds Per Day</span>
-          <span className="text-sm font-medium">{analytics.feedsPerDay}</span>
-        </div>
-      </div>
-      
       {/* Filter Status */}
       {(appliedFilter.startDate || appliedFilter.endDate || appliedFilter.minDuration || appliedFilter.maxDuration || 
         appliedFilter.breastSide || appliedFilter.unlatchReason) && (
@@ -1171,127 +1221,61 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
         ) : filteredEntries.length > 0 ? (
           <ScrollArea className="h-[400px]">
             <div className="space-y-6">
-              {/* Group entries by date */}
-              {(() => {
-                // Sort entries by date (newest first)
-                const sortedEntries = [...filteredEntries].sort((a, b) => {
-                  const dateA = typeof a.dateTimeEntries[0].date === 'string' 
-                    ? new Date(a.dateTimeEntries[0].date).getTime() 
-                    : new Date(a.dateTimeEntries[0].date).getTime();
-                  const dateB = typeof b.dateTimeEntries[0].date === 'string' 
-                    ? new Date(b.dateTimeEntries[0].date).getTime() 
-                    : new Date(b.dateTimeEntries[0].date).getTime();
-                  return dateB - dateA; // Newest first
-                });
-                
-                // Group by date
-                const groupedEntries: Record<string, FeedingLogEntry[]> = {};
-                
-                sortedEntries.forEach(entry => {
-                  try {
-                    const dateValue = typeof entry.dateTimeEntries[0].date === 'string' 
-                      ? parseISO(entry.dateTimeEntries[0].date) 
-                      : new Date(entry.dateTimeEntries[0].date);
-                    
-                    if (isNaN(dateValue.getTime())) {
-                      return;
-                    }
-                    
-                    const dateKey = format(dateValue, "yyyy-MM-dd");
-                    const displayDate = format(dateValue, "EEEE, MMMM d, yyyy");
-                    
-                    if (!groupedEntries[dateKey]) {
-                      groupedEntries[dateKey] = {
-                        entries: [],
-                        displayDate
-                      } as any;
-                    }
-                    
-                    (groupedEntries[dateKey] as any).entries.push(entry);
-                  } catch (error) {
-                    console.error('Error grouping entry by date:', error);
-                  }
-                });
-                
-                // Sort groups by date (newest first)
-                const sortedGroups = Object.keys(groupedEntries).sort().reverse();
-                
-                return sortedGroups.map(dateKey => (
-                  <div key={dateKey} className="space-y-3">
-                    <h3 className="text-sm font-semibold px-1 py-2 bg-muted/30 rounded-md relative">
-                      {(groupedEntries[dateKey] as any).displayDate}
-                    </h3>
-                    
-                    <div className="space-y-3 pl-2">
-                      {(groupedEntries[dateKey] as any).entries.map((entry: FeedingLogEntry) => (
-                        <Card key={entry.id} className="p-4 relative hover:shadow-md transition-shadow duration-200">
-                          <div className="absolute top-2 right-2 flex space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleEdit(entry)}
-                              aria-label="Edit entry"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => confirmDelete(entry.id)}
-                              aria-label="Delete entry"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center mb-3 text-primary">
-                            <Clock className="h-4 w-4 mr-1.5" />
-                            <span className="text-sm font-medium">{entry.dateTimeEntries[0]?.time || "N/A"}</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-3 mb-2">
-                            <div className="bg-muted/20 p-2 rounded-md">
-                              <p className="text-xs text-muted-foreground">Duration</p>
-                              <p className="text-sm font-medium">{entry.duration} minutes</p>
-                            </div>
-                            
-                            <div className="bg-muted/20 p-2 rounded-md">
-                              <p className="text-xs text-muted-foreground">Breast</p>
-                              <p className="text-sm font-medium">{formatBreastOptions(entry.breastOptions)}</p>
-                            </div>
-                            
-                            {entry.unlatchReason && (
-                              <div className="bg-muted/20 p-2 rounded-md">
-                                <p className="text-xs text-muted-foreground">Unlatch Reason</p>
-                                <p className="text-sm font-medium">{entry.unlatchReason}</p>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {(entry.notes || entry.pumpNotes) && (
-                            <div className="mt-3 border-t pt-2 border-dashed border-muted">
-                              {entry.notes && (
-                                <div className="mb-2">
-                                  <p className="text-xs text-muted-foreground">Notes</p>
-                                  <p className="text-sm">{entry.notes}</p>
-                                </div>
-                              )}
-                              {entry.pumpNotes && (
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Pump Notes</p>
-                                  <p className="text-sm">{entry.pumpNotes}</p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                ));
-              })()}
+              {/* Sample Data Button */}
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full flex items-center justify-center"
+                  onClick={handleLoadSampleLogs}
+                  disabled={isLoadingSamples}
+                >
+                  {isLoadingSamples ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="h-4 w-4 mr-2" />
+                      Load Sample Logs
+                    </>
+                  )}
+                </Button>
+                {sampleLoadStatus && (
+                  <p className={`text-xs mt-1 ${sampleLoadStatus.success ? 'text-green-600' : 'text-red-600'}`}>
+                    {sampleLoadStatus.message}
+                  </p>
+                )}
+              </div>
+              
+              {/* New Logs Button */}
+              <div className="mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full flex items-center justify-center"
+                  onClick={handleLoadNewLogs}
+                  disabled={isLoadingNewLogs}
+                >
+                  {isLoadingNewLogs ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="h-4 w-4 mr-2" />
+                      Load New Logs
+                    </>
+                  )}
+                </Button>
+                {newLogsStatus && (
+                  <p className={`text-xs mt-1 ${newLogsStatus.success ? 'text-green-600' : 'text-red-600'}`}>
+                    {newLogsStatus.message}
+                  </p>
+                )}
+              </div>
             </div>
           </ScrollArea>
         ) : (
@@ -1301,9 +1285,20 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
                 ? "No feeding logs found for the selected date range" 
                 : "No feeding logs found"}
             </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={handleLoadSampleLogs}
+              disabled={isLoadingSamples}
+            >
+              {isLoadingSamples ? "Loading..." : "Load Sample Data"}
+            </Button>
           </div>
         )}
       </CardContent>
+    </Card>
+
       
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
@@ -1322,7 +1317,7 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditing} onOpenChange={(open) => !open && setIsEditing(false)}>
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Edit Feeding Log</DialogTitle>
@@ -1518,6 +1513,6 @@ export function PastEntries({ onDelete }: PastEntriesProps): React.ReactNode {
           </Form>
         </DialogContent>
       </Dialog>
-    </Card>
-  );
+  </>
+);
 }
